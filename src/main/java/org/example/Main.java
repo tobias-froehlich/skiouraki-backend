@@ -23,62 +23,64 @@ import java.util.Set;
 public class Main {
     public static void main(String[] args) throws Exception {
 
-        Connection connection = null;
+//        Connection connection = null;
+        String dbUrl = null;
+        String username = null;
+        String password = null;
         if (System.getenv("LOCAL_DB_URL") != null) {
-            String dbUrl = System.getenv("LOCAL_DB_URL");
-            String username = System.getenv("LOCAL_DB_USERNAME");
-            String password = System.getenv("LOCAL_DB_PASSWORD");
-            connection = DriverManager.getConnection(dbUrl, username, password);
+            dbUrl = System.getenv("LOCAL_DB_URL");
+            username = System.getenv("LOCAL_DB_USERNAME");
+            password = System.getenv("LOCAL_DB_PASSWORD");
+//            connection = DriverManager.getConnection(dbUrl, username, password);
         }
         else {
             URI dbUri = new URI(System.getenv("DATABASE_URL"));
             String[] usernamePassword = dbUri.getUserInfo().split(":");
-            String username = usernamePassword[0];
-            String password = usernamePassword[1];
+            username = usernamePassword[0];
+            password = usernamePassword[1];
             System.out.println("username: " + username);
             System.out.println("password: " + password);
-            String dbUrl = "jdbc:postgresql://" + dbUri.getHost() + ":" + dbUri.getPort() + dbUri.getPath();
+            dbUrl = "jdbc:postgresql://" + dbUri.getHost() + ":" + dbUri.getPort() + dbUri.getPath();
             System.out.println(dbUrl);
-            connection = DriverManager.getConnection(dbUrl, username, password);
             System.out.println("Connected to database.");
         }
 
-        DSLContext dslContext = DSL.using(connection, SQLDialect.POSTGRES);
-//        dslContext.settings().setRenderQuotedNames(RenderQuotedNames.ALWAYS);
-//        dslContext.settings().setRenderNameCase(RenderNameCase.LOWER);
-        Migrator migrator = new Migrator(dslContext);
-        migrator.reset();
-        migrator.migrate();
+        try (Connection connection = DriverManager.getConnection(dbUrl, username, password)) {
+            DSLContext dslContext = DSL.using(connection, SQLDialect.POSTGRES);
+            Migrator migrator = new Migrator(dslContext);
+            migrator.reset();
+            migrator.migrate();
 
-        Server server = new Server(Integer.parseInt(System.getenv("PORT")));
+            Server server = new Server(Integer.parseInt(System.getenv("PORT")));
 
-        ServletContextHandler handler = new ServletContextHandler(ServletContextHandler.SESSIONS);
-        handler.setContextPath("/");
+            ServletContextHandler handler = new ServletContextHandler(ServletContextHandler.SESSIONS);
+            handler.setContextPath("/");
 
-        final UserDAO userDAO = new UserDAO(dslContext);
-        final UserResource userResource = new UserResource(userDAO, migrator);
+            final UserDAO userDAO = new UserDAO(dslContext);
+            final UserResource userResource = new UserResource(userDAO, migrator);
 
-        ResourceConfig resourceConfig = new ResourceConfig();
-        Set<Object> instances = new HashSet<>();
-        instances.add(userResource);
-        resourceConfig.registerInstances(instances);
-        resourceConfig.register(new ApplicationExceptionMapper());
-        resourceConfig.register(JacksonFeature.class);
-        resourceConfig.register(new ContainerResponseFilter() {
-                                    @Override
-                                    public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) throws IOException {
-                                        responseContext.getHeaders().add("Access-Control-Allow-origin", "*");
-                                        responseContext.getHeaders().add("Access-Control-Allow-headers",
-                                                "Origin, content-type, accept, authorization");
-                                        responseContext.getHeaders().add("Access-Control-Allow-Methods",
-                                                "GET, POST, PUT, DELETE, OPTIONS, HEAD");
-                                    }
-                                });
+            ResourceConfig resourceConfig = new ResourceConfig();
+            Set<Object> instances = new HashSet<>();
+            instances.add(userResource);
+            resourceConfig.registerInstances(instances);
+            resourceConfig.register(new ApplicationExceptionMapper());
+            resourceConfig.register(JacksonFeature.class);
+            resourceConfig.register(new ContainerResponseFilter() {
+                @Override
+                public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) throws IOException {
+                    responseContext.getHeaders().add("Access-Control-Allow-origin", "*");
+                    responseContext.getHeaders().add("Access-Control-Allow-headers",
+                            "Origin, content-type, accept, authorization");
+                    responseContext.getHeaders().add("Access-Control-Allow-Methods",
+                            "GET, POST, PUT, DELETE, OPTIONS, HEAD");
+                }
+            });
 
-                handler.addServlet(new ServletHolder(new ServletContainer(resourceConfig)), "/*");
+            handler.addServlet(new ServletHolder(new ServletContainer(resourceConfig)), "/*");
 
-        server.setHandler(handler);
-        server.start();
-        server.join();
+            server.setHandler(handler);
+            server.start();
+            server.join();
+        }
     }
 }
