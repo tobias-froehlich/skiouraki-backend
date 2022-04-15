@@ -140,7 +140,7 @@ public class UserDAO {
         }
         String[] words = auth.split(" ");
         String credentials = new String(Base64.getDecoder().decode(words[1]));
-        String[] credentialWords = credentials.split(":");
+        String[] credentialWords = credentials.split(":", 2);
         if (words.length != 2) {
             throw new ApplicationException("Wrong authentication header.");
         }

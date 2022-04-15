@@ -210,6 +210,17 @@ public class UserDAOTest extends TestWithDB {
     }
 
     @Test
+    public void testAddUserWithColonInPassword() {
+        User user = new User(null, null, "John", "johns:password");
+        User addedUser = userDAO.addUser(user);
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(addedUser.getId()))
+                .fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThatUserHasPassword(usersFromDB.get(0), "johns:password");
+    }
+
+    @Test
     public void testUpdateUser() {
         User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
         userDAO.addUser(new User(null, null, "Joe", "joes-password"));
