@@ -6,7 +6,14 @@ import org.jooq.RecordMapper;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -16,71 +23,74 @@ import static org.jooq.impl.DSL.table;
 
 public class UserDAO {
     private final DSLContext dslContext;
+    private MessageDigest digest;
+
+
 
     public UserDAO(DSLContext dslContext) {
         this.dslContext = dslContext;
+        try {
+            this.digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
     }
 
     public List<User> getAllAppUsers() {
-        List<User> users = dslContext.selectFrom("user_account").fetch(new UserMapper());
-        for(User user : users) {
-            user.setPassword("");
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account").fetch(new UserMapper());
+        List<User> users = new ArrayList<>();
+        for(UserFromDB userFromDB : usersFromDB) {
+            users.add(new User(userFromDB.getId(), userFromDB.getVersion(), userFromDB.getName(), null));
         }
         return users;
     }
 
     public User getUser(String id, String auth) throws ApplicationException {
-        List<User> users = dslContext.selectFrom("user_account")
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
                 .where(field("id").eq(id))
                 .fetch(new UserMapper());
-        if (users.size() == 0) {
+        if (usersFromDB.size() == 0) {
             throw new ApplicationException("User with id = " + id + " not found.");
         }
-        User user = users.get(0);
-        verifyAuthentication(auth, user);
-        return user;
+        UserFromDB userFromDB = usersFromDB.get(0);
+        verifyAuthentication(auth, userFromDB);
+        return new User(userFromDB.getId(), userFromDB.getVersion(), userFromDB.getName(), null);
     }
 
     public String getUserIdByName(String name) throws ApplicationException {
         String normalizedName = User.getNormalizedName(name);
-        List<User> users = dslContext.selectFrom("user_account")
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
                 .where(field("normalized_name").eq(normalizedName))
                 .fetch(new UserMapper());
-        if (users.size() == 0) {
+        if (usersFromDB.size() == 0) {
             throw new ApplicationException("User not found.");
         }
-        User user = users.get(0);
-        return user.getId();
+        UserFromDB userFromDB = usersFromDB.get(0);
+        return userFromDB.getId();
     }
 
     public User addUser(User user) throws ApplicationException {
+        System.out.println(user);
         if (!User.isNameValid(user.getName())) {
             throw new ApplicationException("Invalid user name.");
         }
         String newId = UUID.randomUUID().toString();
         String newVersion = UUID.randomUUID().toString();
-//        dslContext.transaction(configuration -> {
-//            Integer count = DSL.using(configuration)
-//                    .selectCount()
-//                    .from("user_account")
-//                    .where(field("name").eq(user.getName()))
-//                    .fetchOne(0, Integer.class);
-//            if (count != null && count > 0) {
-//                throw new ApplicationException("Cannot insert user. User with name " + user.getName() + " already exists.");
-//            }
-//            DSL.using(configuration)
-//                    .insertInto(table("user_account"))
-//                    .columns(field("id"), field("version"), field("name"), field("password"))
-//                    .values(newId, newVersion, user.getName(), user.getPassword())
-//                    .execute();
-//        });
         String normalizedName = User.getNormalizedName(user.getName());
+
+        HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, user.getPassword());
+        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
+        byte[] salt = hashedPasswordAndSalt.salt;
+        //System.out.println(Base64.getEncoder().encode(hashedPassword);
+        //System.out.println(Base64.getEncoder().encode(salt));
+        System.out.println(new String(Base64.getEncoder().encode(hashedPassword), StandardCharsets.UTF_8));
         try {
             dslContext.insertInto(table("user_account"))
-                    .columns(field("id"), field("version"), field("name"), field("normalized_name"), field("password"))
-                    .values(newId, newVersion, user.getName(), normalizedName, user.getPassword())
+                    .columns(field("id"), field("version"), field("name"), field("normalized_name"), field("hashed_password"), field("salt"))
+                    .values(newId, newVersion, user.getName(), normalizedName, new String(Base64.getEncoder().encode(hashedPassword), StandardCharsets.UTF_8), new String(Base64.getEncoder().encode(salt), StandardCharsets.UTF_8))
                     .execute();
         } catch (DataAccessException e) {
+            e.printStackTrace();
             throw new ApplicationException("Cannot insert user. User with name " + user.getName() + " already exists.");
         }
         return getUser(newId, makeAuth(newId, user.getPassword()));
@@ -92,32 +102,15 @@ public class UserDAO {
             throw new ApplicationException("Invalid user name.");
         }
         String newVersion = UUID.randomUUID().toString();
-//        dslContext.transaction(configuration -> {
-//            List<User> users = DSL.using(configuration)
-//                    .selectFrom("user_account")
-//                    .where(field("id").eq(user.getId()))
-//                    .fetch(new UserMapper());
-//            int count = users.size();
-//            if (count != 1) {
-//                throw new ApplicationException("User with id = " + user.getId() + " exists " + count + " times.");
-//            }
-//            if (user.getVersion() == null || !user.getVersion().equals(users.get(0).getVersion())) {
-//                throw new ApplicationException("User with id = " + user.getId() + " has a new version.");
-//            }
-//            DSL.using(configuration)
-//                    .update(table("user_account"))
-//                    .set(field("id"), user.getId())
-//                    .set(field("version"), newVersion)
-//                    .set(field("name"), user.getName())
-//                    .set(field("password"), user.getPassword())
-//                    .where(field("id").eq(user.getId()))
-//                    .execute();
-//        });
+        HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, user.getPassword());
+        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
+        byte[] salt = hashedPasswordAndSalt.salt;
         int count = dslContext.update(table("user_account"))
                 .set(field("id"), user.getId())
                 .set(field("version"), newVersion)
                 .set(field("name"), user.getName())
-                .set(field("password"), user.getPassword())
+                .set(field("hashed_password"), new String(Base64.getEncoder().encode(hashedPassword), StandardCharsets.UTF_8))
+                .set(field("salt"), new String(Base64.getEncoder().encode(salt), StandardCharsets.UTF_8))
                 .where(field("id").eq(user.getId()))
                 .and(field("version").eq(user.getVersion()))
                 .execute();
@@ -136,10 +129,12 @@ public class UserDAO {
     }
 
     private String makeAuth(String id, String password) {
+//        HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, password, salt);
+//        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
         return "Basic " + new String(Base64.getEncoder().encode((id + ":" + password).getBytes(StandardCharsets.UTF_8)));
     }
 
-    private void verifyAuthentication(String auth, User user) {
+    private void verifyAuthentication(String auth, UserFromDB userFromDB) {
         if (auth == null) {
             throw new ApplicationException("Authentication header is missing.");
         }
@@ -152,19 +147,57 @@ public class UserDAO {
         if (!"Basic".equals(words[0])) {
             throw new ApplicationException("Wrong authentication method.");
         }
-        if (credentialWords.length != 2 || !credentialWords[0].equals(user.getId()) || !credentialWords[1].equals(user.getPassword())) {
+
+        System.out.println("sent password = " + credentialWords[1]);
+        HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, credentialWords[1], userFromDB.getSalt());
+        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
+        System.out.println("sent hashed password = " + Arrays.toString(hashedPassword));
+        System.out.println("db hashed password = " + Arrays.toString(userFromDB.getHashedPassword()));
+        if (credentialWords.length != 2 || !credentialWords[0].equals(userFromDB.getId()) || !Arrays.equals(hashedPassword, userFromDB.getHashedPassword())) {
             throw new ApplicationException("Wrong credentials.");
         }
     }
 
-    public static class UserMapper implements RecordMapper<Record, User> {
+    private static class HashedPasswordAndSalt {
+        public byte[] hashedPassword;
+        public byte[] salt;
+
+        public HashedPasswordAndSalt(MessageDigest digest, String password) {
+            byte[] salt = new byte[16];
+            new SecureRandom().nextBytes(salt);
+            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+            try {
+                stream.write(salt);
+                stream.write(password.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            this.hashedPassword = digest.digest(stream.toByteArray());
+            this.salt = salt;
+        }
+
+        public HashedPasswordAndSalt(MessageDigest digest, String password, byte[] salt) {
+            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+            try {
+                stream.write(salt);
+                stream.write(password.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            this.hashedPassword = digest.digest(stream.toByteArray());
+            this.salt = salt;
+        }
+    }
+
+    public static class UserMapper implements RecordMapper<Record, UserFromDB> {
         @Override
-        public User map(Record record) {
-            return new User(
+        public UserFromDB map(Record record) {
+            return new UserFromDB(
                     record.getValue("id", String.class),
                     record.getValue("version", String.class),
                     record.getValue("name", String.class),
-                    record.getValue("password", String.class)
+                    Base64.getDecoder().decode(record.getValue("hashed_password", String.class)),
+                    Base64.getDecoder().decode(record.getValue("salt", String.class))
             );
         }
     }

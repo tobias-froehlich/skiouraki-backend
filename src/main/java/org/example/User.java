@@ -2,6 +2,7 @@ package org.example;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.Arrays;
 import java.util.Map;
 
 public class User {
@@ -24,6 +25,8 @@ public class User {
         this.name = name;
         this.password = password;
     }
+
+
 
     public String getId() {
         return id;
@@ -92,18 +95,28 @@ public class User {
             return false;
         }
         User other = (User) obj;
-        if (!this.getId().equals(other.getId())) {
+        if (other.getId() != null && (this.getId() == null || !this.getId().equals(other.getId()))) {
             return false;
         }
-        if (!this.getVersion().equals(other.getVersion())) {
+        if  (other.getVersion() != null && (this.getVersion() == null || !this.getVersion().equals(other.getVersion()))) {
             return false;
         }
-        if (!this.getName().equals(other.getName())) {
+        if (other.getName() != null && (this.getName() == null || !this.getName().equals(other.getName()))) {
             return false;
         }
-        if (!this.getPassword().equals(other.getPassword())) {
+        if (other.getPassword() != null && (this.getPassword() == null || !this.getPassword().equals(other.getPassword()))) {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "id='" + id + '\'' +
+                ", version='" + version + '\'' +
+                ", name='" + name + '\'' +
+                ", password='" + password + '\'' +
+                '}';
     }
 }

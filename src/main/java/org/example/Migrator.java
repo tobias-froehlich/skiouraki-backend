@@ -34,8 +34,9 @@ public class Migrator {
                     .column("id", VARCHAR(36))
                     .column("version", VARCHAR(36))
                     .column("name", VARCHAR(16))
-                    .column("normalized_name", VARCHAR(16))
-                    .column("password", VARCHAR(36))
+                    .column("normalized_name", VARCHAR(32))
+                    .column("hashed_password", VARCHAR(64))
+                    .column("salt", VARCHAR(64))
                     .execute();
         }));
         migrationSteps.add(new MigrationStep("Adding Primary key to user table.", ctx -> {
@@ -58,14 +59,6 @@ public class Migrator {
                             DSL.constraint("unique_normalized_name").unique("normalized_name")
                     ).execute();
         }));
-//        migrationSteps.add(new MigrationStep("Add example user.", ctx -> {
-//            ctx.insertInto(table("user_account"))
-//                    .set(field("id"), "example-id")
-//                    .set(field("version"), "example-version")
-//                    .set(field("name"), "example-name")
-//                    .set(field("password"), "example-password")
-//                    .execute();
-//        }));
     }
 
     public void reset() {
@@ -77,12 +70,6 @@ public class Migrator {
         dslContext.createTableIfNotExists("migration")
                 .column("number", INTEGER)
                 .execute();
-//        String query = "CREATE TABLE IF NOT EXISTS migration (number integer);";
-//        try (PreparedStatement statement = connection.prepareStatement(query)) {
-//            statement.execute();
-//        } catch (SQLException e) {
-//            e.printStackTrace();
-//        }
         for (int i = 0; i < migrationSteps.size(); i++) {
             Integer count = dslContext
                     .selectCount()
