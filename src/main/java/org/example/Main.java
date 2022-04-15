@@ -23,7 +23,6 @@ import java.util.Set;
 public class Main {
     public static void main(String[] args) throws Exception {
 
-//        Connection connection = null;
         String dbUrl = null;
         String username = null;
         String password = null;
@@ -31,7 +30,6 @@ public class Main {
             dbUrl = System.getenv("LOCAL_DB_URL");
             username = System.getenv("LOCAL_DB_USERNAME");
             password = System.getenv("LOCAL_DB_PASSWORD");
-//            connection = DriverManager.getConnection(dbUrl, username, password);
         }
         else {
             URI dbUri = new URI(System.getenv("DATABASE_URL"));

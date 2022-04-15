@@ -25,8 +25,6 @@ public class UserDAO {
     private final DSLContext dslContext;
     private MessageDigest digest;
 
-
-
     public UserDAO(DSLContext dslContext) {
         this.dslContext = dslContext;
         try {
@@ -81,8 +79,6 @@ public class UserDAO {
         HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, user.getPassword());
         String hashedPassword = hashedPasswordAndSalt.hashedPassword;
         String salt = hashedPasswordAndSalt.salt;
-        //System.out.println(Base64.getEncoder().encode(hashedPassword);
-        //System.out.println(Base64.getEncoder().encode(salt));
         System.out.println(hashedPassword);
         try {
             dslContext.insertInto(table("user_account"))
@@ -101,6 +97,7 @@ public class UserDAO {
         if (!User.isNameValid(user.getName())) {
             throw new ApplicationException("Invalid user name.");
         }
+        String normalizedName = User.getNormalizedName(user.getName());
         String newVersion = UUID.randomUUID().toString();
         HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, user.getPassword());
         String hashedPassword = hashedPasswordAndSalt.hashedPassword;
@@ -109,6 +106,7 @@ public class UserDAO {
                 .set(field("id"), user.getId())
                 .set(field("version"), newVersion)
                 .set(field("name"), user.getName())
+                .set(field("normalized_name"), normalizedName)
                 .set(field("hashed_password"), hashedPassword)
                 .set(field("salt"), salt)
                 .where(field("id").eq(user.getId()))
@@ -129,9 +127,8 @@ public class UserDAO {
     }
 
     private String makeAuth(String id, String password) {
-//        HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, password, salt);
-//        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
-        return "Basic " + new String(Base64.getEncoder().encode((id + ":" + password).getBytes(StandardCharsets.UTF_8)));
+        return "Basic " + new String(
+                Base64.getEncoder().encode((id + ":" + password).getBytes(StandardCharsets.UTF_8)));
     }
 
     private void verifyAuthentication(String auth, UserFromDB userFromDB) {
