@@ -69,14 +69,14 @@ public class UserDAOTest extends TestWithDB {
 
     @Test
     public void testGetUser() {
-        byte[] hashedPassword = hashPasswordWithSalt("johns-password", "abcd".getBytes(StandardCharsets.UTF_8));
-        System.out.println("before writen to db hashed password = " + Arrays.toString(hashedPassword));
+        String hashedPassword = hashPasswordWithSalt("johns-password", "abcd");
+        System.out.println("before writen to db hashed password = " + hashedPassword);
         dslContext.insertInto(table("user_account"))
                 .set(field("id"), "test-id")
                 .set(field("version"), "test-version")
                 .set(field("name"), "John")
-                .set(field("hashed_password"), Base64.getEncoder().encode(hashedPassword))
-                .set(field("salt"), Base64.getEncoder().encode("abcd".getBytes(StandardCharsets.UTF_8)))
+                .set(field("hashed_password"), hashedPassword)
+                .set(field("salt"), "abcd")
                 .execute();
         User expected = new User("test-id", "test-version", "John", null);
         User actual = userDAO.getUser("test-id", "Basic dGVzdC1pZDpqb2hucy1wYXNzd29yZA==");
@@ -85,13 +85,13 @@ public class UserDAOTest extends TestWithDB {
 
     @Test
     public void testTryToGetUserWithWrongPassword() {
-        byte[] hashedPassword = hashPasswordWithSalt("johns-password", "abcd".getBytes(StandardCharsets.UTF_8));
-        System.out.println("before writen to db hashed password = " + Arrays.toString(hashedPassword));
+        String hashedPassword = hashPasswordWithSalt("johns-password", "abcd");
+        System.out.println("before writen to db hashed password = " + hashedPassword);
         dslContext.insertInto(table("user_account"))
                 .set(field("id"), "test-id")
                 .set(field("version"), "test-version")
                 .set(field("name"), "John")
-                .set(field("hashed_password"), Base64.getEncoder().encode(hashedPassword))
+                .set(field("hashed_password"), hashedPassword)
                 .set(field("salt"), Base64.getEncoder().encode("abcd".getBytes(StandardCharsets.UTF_8)))
                 .execute();
         assertThatThrownBy(() -> {
@@ -306,13 +306,13 @@ public class UserDAOTest extends TestWithDB {
     }
 
     private void assertThatUserHasPassword(UserFromDB userFromDB, String password) {
-        byte[] hashedPassword = userFromDB.getHashedPassword();
-        byte[] salt = userFromDB.getSalt();
-        byte[] expectedHashedPassword = hashPasswordWithSalt(password, salt);
+        String hashedPassword = userFromDB.getHashedPassword();
+        String salt = userFromDB.getSalt();
+        String expectedHashedPassword = hashPasswordWithSalt(password, salt);
         assertThat(hashedPassword).isEqualTo(expectedHashedPassword);
     }
 
-    private byte[] hashPasswordWithSalt(String password, byte[] salt) {
+    private String hashPasswordWithSalt(String password, String salt) {
         MessageDigest digest = null;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -322,11 +322,11 @@ public class UserDAOTest extends TestWithDB {
         assertThat(digest).isNotNull();
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         try {
-            stream.write(salt);
+            stream.write(Base64.getDecoder().decode(salt));
             stream.write(password.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return digest.digest(stream.toByteArray());
+        return new String(Base64.getEncoder().encode(digest.digest(stream.toByteArray())), StandardCharsets.UTF_8);
     }
 }

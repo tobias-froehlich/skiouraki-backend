@@ -79,15 +79,15 @@ public class UserDAO {
         String normalizedName = User.getNormalizedName(user.getName());
 
         HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, user.getPassword());
-        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
-        byte[] salt = hashedPasswordAndSalt.salt;
+        String hashedPassword = hashedPasswordAndSalt.hashedPassword;
+        String salt = hashedPasswordAndSalt.salt;
         //System.out.println(Base64.getEncoder().encode(hashedPassword);
         //System.out.println(Base64.getEncoder().encode(salt));
-        System.out.println(new String(Base64.getEncoder().encode(hashedPassword), StandardCharsets.UTF_8));
+        System.out.println(hashedPassword);
         try {
             dslContext.insertInto(table("user_account"))
                     .columns(field("id"), field("version"), field("name"), field("normalized_name"), field("hashed_password"), field("salt"))
-                    .values(newId, newVersion, user.getName(), normalizedName, new String(Base64.getEncoder().encode(hashedPassword), StandardCharsets.UTF_8), new String(Base64.getEncoder().encode(salt), StandardCharsets.UTF_8))
+                    .values(newId, newVersion, user.getName(), normalizedName, hashedPassword, salt)
                     .execute();
         } catch (DataAccessException e) {
             e.printStackTrace();
@@ -103,14 +103,14 @@ public class UserDAO {
         }
         String newVersion = UUID.randomUUID().toString();
         HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, user.getPassword());
-        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
-        byte[] salt = hashedPasswordAndSalt.salt;
+        String hashedPassword = hashedPasswordAndSalt.hashedPassword;
+        String salt = hashedPasswordAndSalt.salt;
         int count = dslContext.update(table("user_account"))
                 .set(field("id"), user.getId())
                 .set(field("version"), newVersion)
                 .set(field("name"), user.getName())
-                .set(field("hashed_password"), new String(Base64.getEncoder().encode(hashedPassword), StandardCharsets.UTF_8))
-                .set(field("salt"), new String(Base64.getEncoder().encode(salt), StandardCharsets.UTF_8))
+                .set(field("hashed_password"), hashedPassword)
+                .set(field("salt"), salt)
                 .where(field("id").eq(user.getId()))
                 .and(field("version").eq(user.getVersion()))
                 .execute();
@@ -150,17 +150,17 @@ public class UserDAO {
 
         System.out.println("sent password = " + credentialWords[1]);
         HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, credentialWords[1], userFromDB.getSalt());
-        byte[] hashedPassword = hashedPasswordAndSalt.hashedPassword;
-        System.out.println("sent hashed password = " + Arrays.toString(hashedPassword));
-        System.out.println("db hashed password = " + Arrays.toString(userFromDB.getHashedPassword()));
-        if (credentialWords.length != 2 || !credentialWords[0].equals(userFromDB.getId()) || !Arrays.equals(hashedPassword, userFromDB.getHashedPassword())) {
+        String hashedPassword = hashedPasswordAndSalt.hashedPassword;
+        System.out.println("sent hashed password = " + hashedPassword);
+        System.out.println("db hashed password = " + userFromDB.getHashedPassword());
+        if (credentialWords.length != 2 || !credentialWords[0].equals(userFromDB.getId()) || !hashedPassword.equals(userFromDB.getHashedPassword())) {
             throw new ApplicationException("Wrong credentials.");
         }
     }
 
     private static class HashedPasswordAndSalt {
-        public byte[] hashedPassword;
-        public byte[] salt;
+        public String hashedPassword;
+        public String salt;
 
         public HashedPasswordAndSalt(MessageDigest digest, String password) {
             byte[] salt = new byte[16];
@@ -172,19 +172,19 @@ public class UserDAO {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            this.hashedPassword = digest.digest(stream.toByteArray());
-            this.salt = salt;
+            this.hashedPassword = new String(Base64.getEncoder().encode(digest.digest(stream.toByteArray())), StandardCharsets.UTF_8);
+            this.salt = new String(Base64.getEncoder().encode(salt), StandardCharsets.UTF_8);
         }
 
-        public HashedPasswordAndSalt(MessageDigest digest, String password, byte[] salt) {
+        public HashedPasswordAndSalt(MessageDigest digest, String password, String salt) {
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
             try {
-                stream.write(salt);
+                stream.write(Base64.getDecoder().decode(salt));
                 stream.write(password.getBytes(StandardCharsets.UTF_8));
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            this.hashedPassword = digest.digest(stream.toByteArray());
+            this.hashedPassword = new String(Base64.getEncoder().encode(digest.digest(stream.toByteArray())), StandardCharsets.UTF_8);
             this.salt = salt;
         }
     }
@@ -196,8 +196,8 @@ public class UserDAO {
                     record.getValue("id", String.class),
                     record.getValue("version", String.class),
                     record.getValue("name", String.class),
-                    Base64.getDecoder().decode(record.getValue("hashed_password", String.class)),
-                    Base64.getDecoder().decode(record.getValue("salt", String.class))
+                    record.getValue("hashed_password", String.class),
+                    record.getValue("salt", String.class)
             );
         }
     }

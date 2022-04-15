@@ -4,15 +4,15 @@ public class UserFromDB {
     private String id;
     private String version;
     private String name;
-    private byte[] hashedPassword;
-    private byte[] salt;
+    private String hashedPassword;
+    private String salt;
 
     public UserFromDB(
             String id,
             String version,
             String name,
-            byte[] hashedPassword,
-            byte[] salt) {
+            String hashedPassword,
+            String salt) {
         this.id = id;
         this.version = version;
         this.name = name;
@@ -44,19 +44,19 @@ public class UserFromDB {
         this.name = name;
     }
 
-    public byte[] getHashedPassword() {
+    public String getHashedPassword() {
         return hashedPassword;
     }
 
-    public void setHashedPassword(byte[] hashedPassword) {
+    public void setHashedPassword(String hashedPassword) {
         this.hashedPassword = hashedPassword;
     }
 
-    public byte[] getSalt() {
+    public String getSalt() {
         return salt;
     }
 
-    public void setSalt(byte[] salt) {
+    public void setSalt(String salt) {
         this.salt = salt;
     }
 }
