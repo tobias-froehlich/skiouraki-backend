@@ -35,8 +35,8 @@ public class Migrator {
                     .column("version", VARCHAR(36))
                     .column("name", VARCHAR(16))
                     .column("normalized_name", VARCHAR(32))
-                    .column("hashed_password", VARCHAR(64))
-                    .column("salt", VARCHAR(64))
+                    .column("hashed_password", VARCHAR(44))
+                    .column("salt", VARCHAR(24))
                     .execute();
         }));
         migrationSteps.add(new MigrationStep("Adding Primary key to user table.", ctx -> {
