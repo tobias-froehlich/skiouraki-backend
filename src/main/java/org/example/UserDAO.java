@@ -122,10 +122,10 @@ public class UserDAO {
         return getUser(user.getId(), makeAuth(user.getId(), user.getPassword()));
     }
 
-    public User deleteUser(User user, String auth) {
-        User authenticatedUser = getUser(user.getId(), auth);
+    public User deleteUser(String id, String auth) {
+        User authenticatedUser = getUser(id, auth);
         dslContext.deleteFrom(table("user_account"))
-                .where(field("id").eq(user.getId()))
+                .where(field("id").eq(id))
                 .execute();
         return authenticatedUser;
     }

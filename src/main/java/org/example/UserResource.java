@@ -1,6 +1,7 @@
 package org.example;
 
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
@@ -71,6 +72,12 @@ public class UserResource {
             throw new ApplicationException("The user cannot be updated because the id in the path is different from the id in the body.");
         }
         return userDAO.updateUser(user, auth);
+    }
+
+    @DELETE
+    @Path("delete/{id}")
+    public User deleteUser(@PathParam("id") String id, @HeaderParam("Authorization") String auth) {
+        return userDAO.deleteUser(id, auth);
     }
 
 }

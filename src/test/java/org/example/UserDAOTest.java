@@ -383,7 +383,7 @@ public class UserDAOTest extends TestWithDB {
     public void testDeleteUser() {
         User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
         User otherUser = userDAO.addUser(new User(null, null, "Joe", "joes-password"));
-        User deletedUser = userDAO.deleteUser(addedUser, makeAuth(addedUser.getId(), "johns-password"));
+        User deletedUser = userDAO.deleteUser(addedUser.getId(), makeAuth(addedUser.getId(), "johns-password"));
         assertThat(deletedUser).isEqualTo(addedUser);
         List<UserFromDB> remainingUsers = dslContext.selectFrom("user_account").fetch(new UserDAO.UserMapper());
         assertThat(remainingUsers).hasSize(1);
@@ -396,7 +396,7 @@ public class UserDAOTest extends TestWithDB {
         User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
         User otherUser = userDAO.addUser(new User(null, null, "Joe", "joes-password"));
         assertThatThrownBy(() -> {
-            userDAO.deleteUser(addedUser, makeAuth(addedUser.getId(), "joes-password"));
+            userDAO.deleteUser(addedUser.getId(), makeAuth(addedUser.getId(), "joes-password"));
         }).isInstanceOf(ApplicationException.class).hasMessage("Wrong credentials.");
     }
 
