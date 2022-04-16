@@ -72,6 +72,9 @@ public class UserDAO {
         if (!User.isNameValid(user.getName())) {
             throw new ApplicationException("Invalid user name.");
         }
+        if (!User.isPasswordValid(user.getPassword())) {
+            throw new ApplicationException("Invalid password.");
+        }
         String newId = UUID.randomUUID().toString();
         String newVersion = UUID.randomUUID().toString();
         String normalizedName = User.getNormalizedName(user.getName());
@@ -95,6 +98,9 @@ public class UserDAO {
         User authenticatedUser = getUser(user.getId(), auth);
         if (!User.isNameValid(user.getName())) {
             throw new ApplicationException("Invalid user name.");
+        }
+        if (!User.isPasswordValid(user.getPassword())) {
+            throw new ApplicationException("Invalid password.");
         }
         String normalizedName = User.getNormalizedName(user.getName());
         String newVersion = UUID.randomUUID().toString();

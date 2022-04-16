@@ -1,5 +1,6 @@
 package org.example;
 
+import org.checkerframework.checker.signature.qual.DotSeparatedIdentifiersOrPrimitiveType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,27 +124,6 @@ public class UserDAOTest extends TestWithDB {
         assertThat(actual).isEqualTo(expected);
     }
 
-//    @Test
-//    public void testTryGetUserByNameWithWrongPassword() {
-//        dslContext.insertInto(table("user_account"))
-//                .set(field("id"), "test-id")
-//                .set(field("version"), "test-version")
-//                .set(field("name"), "John")
-//                .set(field("password"), "johns-password")
-//                .execute();
-//        dslContext.insertInto(table("user_account"))
-//                .set(field("id"), "test-id2")
-//                .set(field("version"), "test-version2")
-//                .set(field("name"), "Joe")
-//                .set(field("password"), "joes-password")
-//                .execute();
-//
-//        assertThatThrownBy(() -> {
-//            userDAO.getUserByName("John", makeAuth("test-id", "joes-password"));
-//        }).isInstanceOf(ApplicationException.class).hasMessage("Wrong credentials.");
-//
-//    }
-
     @Test
     public void testAddUser() throws Exception {
         User user = new User(null, null, "John", "johns-password");
@@ -158,7 +138,6 @@ public class UserDAOTest extends TestWithDB {
         assertThat(usersFromDB).hasSize(1);
         assertThat(usersFromDB.get(0).getName()).isEqualTo("John");
         assertThatUserHasPassword(usersFromDB.get(0), "johns-password");
-        System.out.println("hello");
     }
 
     @Test
@@ -194,8 +173,29 @@ public class UserDAOTest extends TestWithDB {
     }
 
     @Test
+    public void testAddUserWithMinimumLengthName() {
+        User user = new User(null, null, "abc", "johns-password");
+        User addedUser = userDAO.addUser(user);
+        String id = addedUser.getId();
+        assertThat(addedUser.getName()).isEqualTo("abc");
+        assertThat(addedUser.getPassword()).isNull();
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(id)).fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThatUserHasPassword(usersFromDB.get(0), "johns-password");
+    }
+
+    @Test
     public void testTryToAddUserWithTooLongUsername() {
         User user = new User(null, null, "abcdefghijklmnopq", "johns-password");
+        assertThatThrownBy(() -> {
+            userDAO.addUser(user);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid user name.");
+    }
+
+    @Test
+    public void testTryToAddUserWithTooShortUsername() {
+        User user = new User(null, null, "ab", "johns-password");
         assertThatThrownBy(() -> {
             userDAO.addUser(user);
         }).isInstanceOf(ApplicationException.class).hasMessage("Invalid user name.");
@@ -218,6 +218,54 @@ public class UserDAOTest extends TestWithDB {
                 .fetch(new UserDAO.UserMapper());
         assertThat(usersFromDB).hasSize(1);
         assertThatUserHasPassword(usersFromDB.get(0), "johns:password");
+    }
+
+    @Test
+    public void testAddUserWithMaximumLengthPassword() {
+        User user = new User(null, null, "John", "01234567890123456789012345678901");
+        User addedUser = null;
+        addedUser = userDAO.addUser(user);
+
+        String id = addedUser.getId();
+        assertThat(addedUser.getName()).isEqualTo("John");
+        assertThat(addedUser.getPassword()).isNull();
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(id)).fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThat(usersFromDB.get(0).getName()).isEqualTo("John");
+        assertThatUserHasPassword(usersFromDB.get(0), "01234567890123456789012345678901");
+    }
+
+    @Test
+    public void testAddUserWithMinmumLengthPassword() {
+        User user = new User(null, null, "John", "0123");
+        User addedUser = null;
+        addedUser = userDAO.addUser(user);
+
+        String id = addedUser.getId();
+        assertThat(addedUser.getName()).isEqualTo("John");
+        assertThat(addedUser.getPassword()).isNull();
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(id)).fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThat(usersFromDB.get(0).getName()).isEqualTo("John");
+        assertThatUserHasPassword(usersFromDB.get(0), "0123");
+    }
+
+    @Test
+    public void testTryToAddUserWithTooLongPassword() {
+        User user = new User(null, null, "John", "012345678901234567890123456789012");
+        assertThatThrownBy(() -> {
+            userDAO.addUser(user);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid password.");
+    }
+
+    @Test
+    public void testTryToAddUserWithTooShortPassword() {
+        User user = new User(null, null, "John", "012");
+        assertThatThrownBy(() -> {
+            userDAO.addUser(user);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid password.");
     }
 
     @Test
@@ -247,6 +295,58 @@ public class UserDAOTest extends TestWithDB {
     }
 
     @Test
+    public void testUpdateUserNameWithMaximumLengthName() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        User updatedUser = userDAO.updateUser(new User(
+                addedUser.getId(),
+                addedUser.getVersion(),
+                "abcdefghijklmnop",
+                "johns-password"
+        ), makeAuth(addedUser.getId(), "johns-password"));
+        assertThat(updatedUser.getId()).isEqualTo(addedUser.getId());
+        assertThat(updatedUser.getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(updatedUser.getName()).isEqualTo("abcdefghijklmnop");
+        assertThat(updatedUser.getPassword()).isNull();
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(addedUser.getId()))
+                .fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThatUserHasPassword(usersFromDB.get(0), "johns-password");
+        assertThat(usersFromDB.get(0).getId()).isEqualTo(addedUser.getId());
+        assertThat(usersFromDB.get(0).getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(usersFromDB.get(0).getName()).isEqualTo("abcdefghijklmnop");
+        assertThat(usersFromDB.get(0).getNormalizedName()).isEqualTo("abcdefghijklmnop");
+    }
+
+    @Test
+    public void testUpdateUserNameWithMinimumLengthName() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        User updatedUser = userDAO.updateUser(new User(
+                addedUser.getId(),
+                addedUser.getVersion(),
+                "abc",
+                "johns-password"
+        ), makeAuth(addedUser.getId(), "johns-password"));
+        assertThat(updatedUser.getId()).isEqualTo(addedUser.getId());
+        assertThat(updatedUser.getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(updatedUser.getName()).isEqualTo("abc");
+        assertThat(updatedUser.getPassword()).isNull();
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(addedUser.getId()))
+                .fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThatUserHasPassword(usersFromDB.get(0), "johns-password");
+        assertThat(usersFromDB.get(0).getId()).isEqualTo(addedUser.getId());
+        assertThat(usersFromDB.get(0).getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(usersFromDB.get(0).getName()).isEqualTo("abc");
+        assertThat(usersFromDB.get(0).getNormalizedName()).isEqualTo("abc");
+    }
+
+    @Test
     public void testUpdateSpellingOfUserName() {
         User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
         userDAO.addUser(new User(null, null, "Joe", "joes-password"));
@@ -273,7 +373,37 @@ public class UserDAOTest extends TestWithDB {
     }
 
     @Test
-    public void tryToUpdateUserNameWithNameThatAlreadyExists() {
+    public void testTryToUpdateUserNameWithTooLongName() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        assertThatThrownBy(() -> {
+            userDAO.updateUser(new User(
+                    addedUser.getId(),
+                    addedUser.getVersion(),
+                    "abcdefghijklmnopq",
+                    "johns-password"
+            ), makeAuth(addedUser.getId(), "johns-password"));
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid user name.");
+    }
+
+    @Test
+    public void testTryToUpdateUserNameWithTooShortName() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        assertThatThrownBy(() -> {
+            userDAO.updateUser(new User(
+                    addedUser.getId(),
+                    addedUser.getVersion(),
+                    "ab",
+                    "johns-password"
+            ), makeAuth(addedUser.getId(), "johns-password"));
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid user name.");
+    }
+
+    @Test
+    public void testTryToUpdateUserNameWithNameThatAlreadyExists() {
         User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
         userDAO.addUser(new User(null, null, "Joe", "joes-password"));
 
@@ -285,7 +415,6 @@ public class UserDAOTest extends TestWithDB {
                     "johns-password"
             ), makeAuth(addedUser.getId(), "johns-password"));
         }).isInstanceOf(ApplicationException.class).hasMessage("The new user name already exists.");
-
     }
 
     @Test
@@ -312,6 +441,88 @@ public class UserDAOTest extends TestWithDB {
         assertThat(usersFromDB.get(0).getVersion()).isNotEqualTo(addedUser.getVersion());
         assertThat(usersFromDB.get(0).getName()).isEqualTo("John");
         assertThat(usersFromDB.get(0).getNormalizedName()).isEqualTo("john");
+    }
+
+    @Test
+    public void testUpdateUserPasswordWithMaximumLengthPassword() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        User updatedUser = userDAO.updateUser(new User(
+                addedUser.getId(),
+                addedUser.getVersion(),
+                "John",
+                "01234567890123456789012345678901"
+        ), makeAuth(addedUser.getId(), "johns-password"));
+        assertThat(updatedUser.getId()).isEqualTo(addedUser.getId());
+        assertThat(updatedUser.getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(updatedUser.getName()).isEqualTo("John");
+        assertThat(updatedUser.getPassword()).isNull();
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(addedUser.getId()))
+                .fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThatUserHasPassword(usersFromDB.get(0), "01234567890123456789012345678901");
+        assertThat(usersFromDB.get(0).getId()).isEqualTo(addedUser.getId());
+        assertThat(usersFromDB.get(0).getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(usersFromDB.get(0).getName()).isEqualTo("John");
+        assertThat(usersFromDB.get(0).getNormalizedName()).isEqualTo("john");
+    }
+
+    @Test
+    public void testUpdateUserPasswordWithMinimumLengthPassword() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        User updatedUser = userDAO.updateUser(new User(
+                addedUser.getId(),
+                addedUser.getVersion(),
+                "John",
+                "0123"
+        ), makeAuth(addedUser.getId(), "johns-password"));
+        assertThat(updatedUser.getId()).isEqualTo(addedUser.getId());
+        assertThat(updatedUser.getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(updatedUser.getName()).isEqualTo("John");
+        assertThat(updatedUser.getPassword()).isNull();
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(addedUser.getId()))
+                .fetch(new UserDAO.UserMapper());
+        assertThat(usersFromDB).hasSize(1);
+        assertThatUserHasPassword(usersFromDB.get(0), "0123");
+        assertThat(usersFromDB.get(0).getId()).isEqualTo(addedUser.getId());
+        assertThat(usersFromDB.get(0).getVersion()).isNotEqualTo(addedUser.getVersion());
+        assertThat(usersFromDB.get(0).getName()).isEqualTo("John");
+        assertThat(usersFromDB.get(0).getNormalizedName()).isEqualTo("john");
+    }
+
+    @Test
+    public void tryToUpdatePasswordWithTooLongPassword() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        assertThatThrownBy(() -> {
+            userDAO.updateUser(new User(
+                    addedUser.getId(),
+                    addedUser.getVersion(),
+                    "John",
+                    "012345678901234567890123456789012"
+            ), makeAuth(addedUser.getId(), "johns-password"));
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid password.");
+    }
+
+    @Test
+    public void tryToUpdatePasswordWithTooShortPassword() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+
+        assertThatThrownBy(() -> {
+            userDAO.updateUser(new User(
+                    addedUser.getId(),
+                    addedUser.getVersion(),
+                    "John",
+                    "012"
+            ), makeAuth(addedUser.getId(), "johns-password"));
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid password.");
     }
 
     @Test

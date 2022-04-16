@@ -13,7 +13,10 @@ public class User {
 
     private static final String VALID_CHARACTERS      = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZäöußÄÖÜẞΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσςΤτΥυΦφΧχΨψΩω";
     private static final String NORMALIZED_CHARACTERS = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzaousaousaabbggddeezzhhttiikkllmmnnccoopprrsssttyyffxxppoo";
+    private static final int MIN_NAME_LENGTH = 3;
     private static final int MAX_NAME_LENGTH = 16;
+    private static final int MIN_PASSWORD_LENGTH = 4;
+    private static final int MAX_PASSWORD_LENGTH = 32;
 
     public User(
             @JsonProperty("id") String id,
@@ -61,6 +64,9 @@ public class User {
     }
 
     public static boolean isNameValid(String name) {
+        if (name.length() < MIN_NAME_LENGTH) {
+            return false;
+        }
         if (name.length() > MAX_NAME_LENGTH) {
             return false;
         }
@@ -68,6 +74,16 @@ public class User {
             if (!VALID_CHARACTERS.contains(name.substring(i, i+1))) {
                 return false;
             }
+        }
+        return true;
+    }
+
+    public static boolean isPasswordValid(String password) {
+        if (password.length() < MIN_PASSWORD_LENGTH) {
+            return false;
+        }
+        if (password.length() > MAX_PASSWORD_LENGTH) {
+            return false;
         }
         return true;
     }
