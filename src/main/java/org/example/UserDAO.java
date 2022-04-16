@@ -48,7 +48,7 @@ public class UserDAO {
                 .where(field("id").eq(id))
                 .fetch(new UserMapper());
         if (usersFromDB.size() == 0) {
-            throw new ApplicationException("User with id = " + id + " not found.");
+            throw new ApplicationException("User not found.");
         }
         UserFromDB userFromDB = usersFromDB.get(0);
         verifyAuthentication(auth, userFromDB);
@@ -86,8 +86,7 @@ public class UserDAO {
                     .values(newId, newVersion, user.getName(), normalizedName, hashedPassword, salt)
                     .execute();
         } catch (DataAccessException e) {
-            e.printStackTrace();
-            throw new ApplicationException("Cannot insert user. User with name " + user.getName() + " already exists.");
+            throw new ApplicationException("The user name already exists.");
         }
         return getUser(newId, makeAuth(newId, user.getPassword()));
     }
@@ -102,18 +101,23 @@ public class UserDAO {
         HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, user.getPassword());
         String hashedPassword = hashedPasswordAndSalt.hashedPassword;
         String salt = hashedPasswordAndSalt.salt;
-        int count = dslContext.update(table("user_account"))
-                .set(field("id"), user.getId())
-                .set(field("version"), newVersion)
-                .set(field("name"), user.getName())
-                .set(field("normalized_name"), normalizedName)
-                .set(field("hashed_password"), hashedPassword)
-                .set(field("salt"), salt)
-                .where(field("id").eq(user.getId()))
-                .and(field("version").eq(user.getVersion()))
-                .execute();
+        int count = 0;
+        try {
+            count = dslContext.update(table("user_account"))
+                    .set(field("id"), user.getId())
+                    .set(field("version"), newVersion)
+                    .set(field("name"), user.getName())
+                    .set(field("normalized_name"), normalizedName)
+                    .set(field("hashed_password"), hashedPassword)
+                    .set(field("salt"), salt)
+                    .where(field("id").eq(user.getId()))
+                    .and(field("version").eq(user.getVersion()))
+                    .execute();
+        } catch (DataAccessException e) {
+            throw new ApplicationException("The new user name already exists.");
+        }
         if (count == 0) {
-            throw new ApplicationException("The user does not exist or the version is outdated.");
+            throw new ApplicationException("The version is outdated.");
         }
         return getUser(user.getId(), makeAuth(user.getId(), user.getPassword()));
     }
@@ -193,6 +197,7 @@ public class UserDAO {
                     record.getValue("id", String.class),
                     record.getValue("version", String.class),
                     record.getValue("name", String.class),
+                    record.getValue("normalized_name", String.class),
                     record.getValue("hashed_password", String.class),
                     record.getValue("salt", String.class)
             );
