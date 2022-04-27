@@ -59,10 +59,36 @@ public class Migrator {
                             DSL.constraint("unique_normalized_name").unique("normalized_name")
                     ).execute();
         }));
+        migrationSteps.add(new MigrationStep("Adding shopping list table.", ctx -> {
+            ctx.createTableIfNotExists("shopping_list")
+                    .column("id", VARCHAR(36))
+                    .column("version", VARCHAR(36))
+                    .column("name", VARCHAR(32))
+                    .column("owner", VARCHAR(36))
+                    .execute();
+        }));
+        migrationSteps.add(new MigrationStep("Adding primary key to shopping list table.", ctx -> {
+            ctx.alterTable("shopping_list")
+                    .alterColumn("id")
+                    .setNotNull()
+                    .execute();
+            ctx.alterTable("shopping_list")
+                    .add(
+                            DSL.constraint("pk_shopping_list").primaryKey("id")
+                    ).execute();
+        }));
+        migrationSteps.add(new MigrationStep("Adding foreign key to shoppingList owner.", ctx -> {
+            ctx.alterTable("shopping_list")
+                    .add(
+                            DSL.constraint("foreign_key_shopping_list_owner").foreignKey("owner").references("user_account", "id")
+                    )
+                    .execute();
+        }));
     }
 
     public void reset() {
         dslContext.dropTableIfExists("migration").execute();
+        dslContext.dropTableIfExists("shopping_list").execute();
         dslContext.dropTableIfExists("user_account").execute();
     }
 

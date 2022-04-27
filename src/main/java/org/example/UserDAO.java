@@ -55,6 +55,11 @@ public class UserDAO {
         return new User(userFromDB.getId(), userFromDB.getVersion(), userFromDB.getName(), null);
     }
 
+    public User getUserByAuth(String auth) throws ApplicationException {
+        final IdAndPassword idAndPassword = new IdAndPassword(auth);
+        return getUser(idAndPassword.id, auth);
+    }
+
     public String getUserIdByName(String name) throws ApplicationException {
         String normalizedName = User.getNormalizedName(name);
         List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
@@ -142,26 +147,41 @@ public class UserDAO {
     }
 
     private void verifyAuthentication(String auth, UserFromDB userFromDB) {
-        if (auth == null) {
-            throw new ApplicationException("Authentication header is missing.");
-        }
-        String[] words = auth.split(" ");
-        String credentials = new String(Base64.getDecoder().decode(words[1]));
-        String[] credentialWords = credentials.split(":", 2);
-        if (words.length != 2) {
-            throw new ApplicationException("Wrong authentication header.");
-        }
-        if (!"Basic".equals(words[0])) {
-            throw new ApplicationException("Wrong authentication method.");
-        }
+        final IdAndPassword idAndPassword = new IdAndPassword(auth);
+        final String id = idAndPassword.id;
+        final String password = idAndPassword.password;
 
-        System.out.println("sent password = " + credentialWords[1]);
-        HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, credentialWords[1], userFromDB.getSalt());
+        HashedPasswordAndSalt hashedPasswordAndSalt = new HashedPasswordAndSalt(digest, password, userFromDB.getSalt());
         String hashedPassword = hashedPasswordAndSalt.hashedPassword;
-        System.out.println("sent hashed password = " + hashedPassword);
-        System.out.println("db hashed password = " + userFromDB.getHashedPassword());
-        if (credentialWords.length != 2 || !credentialWords[0].equals(userFromDB.getId()) || !hashedPassword.equals(userFromDB.getHashedPassword())) {
+        if (!id.equals(userFromDB.getId()) || !hashedPassword.equals(userFromDB.getHashedPassword())) {
             throw new ApplicationException("Wrong credentials.");
+        }
+    }
+
+    private static class IdAndPassword {
+        public String id;
+        public String password;
+
+        public IdAndPassword(String auth) {
+            if (auth == null) {
+                throw new ApplicationException("Authentication header is missing.");
+            }
+            String[] words = auth.split(" ");
+            String credentials = new String(Base64.getDecoder().decode(words[1]));
+            String[] credentialWords = credentials.split(":", 2);
+            if (words.length != 2) {
+                throw new ApplicationException("Wrong authentication header.");
+            }
+            if (!"Basic".equals(words[0])) {
+                throw new ApplicationException("Wrong authentication method.");
+            }
+            if (credentialWords.length != 2) {
+                throw new ApplicationException("Wrong credentials.");
+            }
+
+            this.id = credentialWords[0];
+            this.password = credentialWords[1];
+
         }
     }
 

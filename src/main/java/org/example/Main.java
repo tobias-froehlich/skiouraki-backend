@@ -56,10 +56,13 @@ public class Main {
 
             final UserDAO userDAO = new UserDAO(dslContext);
             final UserResource userResource = new UserResource(userDAO, migrator);
+            final ShoppingListDAO shoppingListDAO = new ShoppingListDAO(dslContext);
+            final ShoppingListResource shoppingListResource = new ShoppingListResource(userDAO, shoppingListDAO);
 
             ResourceConfig resourceConfig = new ResourceConfig();
             Set<Object> instances = new HashSet<>();
             instances.add(userResource);
+            instances.add(shoppingListResource);
             resourceConfig.registerInstances(instances);
             resourceConfig.register(new ApplicationExceptionMapper());
             resourceConfig.register(JacksonFeature.class);

@@ -11,6 +11,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+import static org.jooq.impl.DSL.table;
+
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestWithDB {
 
@@ -31,6 +33,7 @@ public class TestWithDB {
 
     @BeforeEach
     public void beforeEach() {
-        dslContext.truncateTable("user_account").execute();
+        dslContext.deleteFrom(table("shopping_list")).execute();
+        dslContext.deleteFrom(table("user_account")).execute();
     }
 }

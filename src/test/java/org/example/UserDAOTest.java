@@ -611,6 +611,26 @@ public class UserDAOTest extends TestWithDB {
         }).isInstanceOf(ApplicationException.class).hasMessage("Wrong credentials.");
     }
 
+    @Test
+    public void testGetUserByAuth() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        User otherUser = userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+        String auth = makeAuth(addedUser.getId(), "johns-password");
+        User expected = new User(addedUser.getId(), addedUser.getVersion(), "John", null);
+        User actual = userDAO.getUserByAuth(auth);
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    public void testTryGettingUserByAuthWithWrongPassword() {
+        User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
+        User otherUser = userDAO.addUser(new User(null, null, "Joe", "joes-password"));
+        String auth = makeAuth(addedUser.getId(), "wrong-password");
+        assertThatThrownBy(() -> {
+            userDAO.getUserByAuth(auth);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Wrong credentials.");
+    }
+
     private String makeAuth(String id, String password) {
         return "Basic " + new String(Base64.getEncoder().encode((id + ":" + password).getBytes(StandardCharsets.UTF_8)));
     }
