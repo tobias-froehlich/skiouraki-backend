@@ -27,41 +27,67 @@ public class ShoppingListResource {
     @GET
     @Path("get/{id}")
     public ShoppingList getShoppingList(@PathParam("id") String id, @HeaderParam("Authorization") String auth) {
-        User authenticatedUser = userDAO.getUserByAuth(auth);
-        ShoppingList shoppingList = shoppingListDAO.getShoppingList(id);
-        if (!shoppingList.getOwner().equals(authenticatedUser.getId())) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        if (!shoppingListDAO.isUserAuthorizedForShoppingList(authenticatedUser, id)) {
             throw new ApplicationException("Not authorized.");
         }
+        ShoppingList shoppingList = shoppingListDAO.getShoppingList(authenticatedUser,id);
+
         return shoppingList;
     }
 
     @GET
     @Path("get-own")
     public List<ShoppingList> getOwnShoppingLists(@HeaderParam("Authorization") String auth) {
-        User authenticatedUser = userDAO.getUserByAuth(auth);
+        User authenticatedUser = userDAO.authenticate(auth);
         return shoppingListDAO.getOwnShoppingLists(authenticatedUser);
+    }
+
+    @GET
+    @Path("get")
+    public List<ShoppingList> getShoppingLists(@HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        return shoppingListDAO.getShoppingLists(authenticatedUser);
     }
 
     @POST
     @Path("add")
     public ShoppingList addShoppingList(ShoppingList shoppingList, @HeaderParam("Authorization") String auth) {
-        User authenticatedUser = userDAO.getUserByAuth(auth);
+        User authenticatedUser = userDAO.authenticate(auth);
         return shoppingListDAO.addShoppingList(authenticatedUser, shoppingList);
     }
 
     @POST
     @Path("rename")
     public ShoppingList renameShoppingList(ShoppingList shoppingList, @HeaderParam("Authorization") String auth) {
-        User authenticatedUser = userDAO.getUserByAuth(auth);
+        User authenticatedUser = userDAO.authenticate(auth);
         return shoppingListDAO.renameShoppingList(authenticatedUser, shoppingList.getId(), shoppingList.getName());
     }
 
     @DELETE
     @Path("delete/{id}")
     public ShoppingList deleteShoppingList(@PathParam("id") String id, @HeaderParam("Authorization") String auth) {
-        User authenticatedUser = userDAO.getUserByAuth(auth);
+        User authenticatedUser = userDAO.authenticate(auth);
         return shoppingListDAO.deleteShoppingList(authenticatedUser, id);
     }
 
+    @POST
+    @Path("invite/{shopping-list-id}/{user-id}")
+    public List<User> invite(@PathParam("shopping-list-id") String shoppingListId, @PathParam("user-id") String userId, @HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        ShoppingList shoppingList = shoppingListDAO.getShoppingList(authenticatedUser, shoppingListId);
+        if (!shoppingList.getOwner().equals(authenticatedUser.getId())) {
+            throw new ApplicationException("Not authorized.");
+        }
+        User invitedUser = userDAO.getUser(userId);
+        return shoppingListDAO.invite(invitedUser, shoppingListId);
+    }
+
+    @POST
+    @Path("accept-invitation/{shopping-list-id}")
+    public void acceptInvitation(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        shoppingListDAO.acceptInvitation(authenticatedUser, shoppingListId);
+    }
 
 }

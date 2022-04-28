@@ -17,6 +17,7 @@ import java.util.function.Function;
 
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.table;
+import static org.jooq.impl.SQLDataType.BOOLEAN;
 import static org.jooq.impl.SQLDataType.INTEGER;
 import static org.jooq.impl.SQLDataType.VARCHAR;
 
@@ -80,7 +81,29 @@ public class Migrator {
         migrationSteps.add(new MigrationStep("Adding foreign key to shoppingList owner.", ctx -> {
             ctx.alterTable("shopping_list")
                     .add(
-                            DSL.constraint("foreign_key_shopping_list_owner").foreignKey("owner").references("user_account", "id")
+                            DSL.constraint("fk_shopping_list_owner").foreignKey("owner").references("user_account", "id")
+                    )
+                    .execute();
+        }));
+        migrationSteps.add(new MigrationStep("Shopping list authorization N to M table.", ctx -> {
+            ctx.createTableIfNotExists("shopping_list_authorization")
+                    .column("shopping_list_id", VARCHAR(36))
+                    .column("user_id", VARCHAR(36))
+                    .column("invitation_accepted", BOOLEAN)
+                    .execute();
+            ctx.alterTable("shopping_list_authorization")
+                    .add(
+                            DSL.constraint("fk_shopping_list_authorization_shopping_list").foreignKey("shopping_list_id").references("shopping_list", "id")
+                    )
+                    .execute();
+            ctx.alterTable("shopping_list_authorization")
+                    .add(
+                            DSL.constraint("fk_shopping_list_authorization_user").foreignKey("user_id").references("user_account", "id")
+                    )
+                    .execute();
+            ctx.alterTable("shopping_list_authorization")
+                    .add(
+                            DSL.constraint("unique_shopping_list_authorization").unique("shopping_list_id", "user_id")
                     )
                     .execute();
         }));
@@ -88,6 +111,7 @@ public class Migrator {
 
     public void reset() {
         dslContext.dropTableIfExists("migration").execute();
+        dslContext.dropTableIfExists("shopping_list_authorization").execute();
         dslContext.dropTableIfExists("shopping_list").execute();
         dslContext.dropTableIfExists("user_account").execute();
     }

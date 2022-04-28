@@ -43,7 +43,18 @@ public class UserDAO {
         return users;
     }
 
-    public User getUser(String id, String auth) throws ApplicationException {
+    public User getUser(String id) throws ApplicationException {
+        List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
+                .where(field("id").eq(id))
+                .fetch(new UserMapper());
+        if (usersFromDB.size() == 0) {
+            throw new ApplicationException("User not found.");
+        }
+        UserFromDB userFromDB = usersFromDB.get(0);
+        return new User(userFromDB.getId(), userFromDB.getVersion(), userFromDB.getName(), null);
+    }
+
+    public User authenticate(String id, String auth) throws ApplicationException {
         List<UserFromDB> usersFromDB = dslContext.selectFrom("user_account")
                 .where(field("id").eq(id))
                 .fetch(new UserMapper());
@@ -55,9 +66,9 @@ public class UserDAO {
         return new User(userFromDB.getId(), userFromDB.getVersion(), userFromDB.getName(), null);
     }
 
-    public User getUserByAuth(String auth) throws ApplicationException {
+    public User authenticate(String auth) throws ApplicationException {
         final IdAndPassword idAndPassword = new IdAndPassword(auth);
-        return getUser(idAndPassword.id, auth);
+        return authenticate(idAndPassword.id, auth);
     }
 
     public String getUserIdByName(String name) throws ApplicationException {
@@ -96,11 +107,11 @@ public class UserDAO {
         } catch (DataAccessException e) {
             throw new ApplicationException("The user name already exists.");
         }
-        return getUser(newId, makeAuth(newId, user.getPassword()));
+        return getUser(newId);
     }
 
     public User updateUser(User user, String auth) throws ApplicationException {
-        User authenticatedUser = getUser(user.getId(), auth);
+        User authenticatedUser = authenticate(user.getId(), auth);
         if (!User.isNameValid(user.getName())) {
             throw new ApplicationException("Invalid user name.");
         }
@@ -130,14 +141,30 @@ public class UserDAO {
         if (count == 0) {
             throw new ApplicationException("The version is outdated.");
         }
-        return getUser(user.getId(), makeAuth(user.getId(), user.getPassword()));
+        return getUser(user.getId());
     }
 
     public User deleteUser(String id, String auth) {
-        User authenticatedUser = getUser(id, auth);
-        dslContext.deleteFrom(table("user_account"))
-                .where(field("id").eq(id))
-                .execute();
+        User authenticatedUser = authenticate(id, auth);
+        dslContext.transaction(configuration -> {
+            DSLContext ctx = DSL.using(configuration);
+            ctx.deleteFrom(table("shopping_list_authorization"))
+                    .where(field("shopping_list_id").in(
+                       ctx.select(field("id"))
+                               .from("shopping_list")
+                               .where(field("owner").eq(id))
+                    ))
+                    .execute();
+            DSL.using(configuration).deleteFrom(table("shopping_list_authorization"))
+                    .where(field("user_id").eq(id))
+                    .execute();
+            DSL.using(configuration).deleteFrom(table("shopping_list"))
+                    .where(field("owner").eq(id))
+                    .execute();
+            DSL.using(configuration).deleteFrom(table("user_account"))
+                    .where(field("id").eq(id))
+                    .execute();
+        });
         return authenticatedUser;
     }
 

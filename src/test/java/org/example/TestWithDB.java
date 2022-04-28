@@ -33,6 +33,7 @@ public class TestWithDB {
 
     @BeforeEach
     public void beforeEach() {
+        dslContext.deleteFrom(table("shopping_list_authorization")).execute();
         dslContext.deleteFrom(table("shopping_list")).execute();
         dslContext.deleteFrom(table("user_account")).execute();
     }

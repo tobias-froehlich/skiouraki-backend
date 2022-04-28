@@ -45,8 +45,8 @@ public class UserResource {
 
     @GET
     @Path("get/{id}")
-    public User getUser(@PathParam("id") String id, @HeaderParam("Authorization") String auth) throws ApplicationException {
-        User user = userDAO.getUser(id, auth);
+    public User getUser(@PathParam("id") String id) throws ApplicationException {
+        User user = userDAO.getUser(id);
         return user;
     }
 

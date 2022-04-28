@@ -80,12 +80,28 @@ public class UserDAOTest extends TestWithDB {
                 .set(field("salt"), "abcd")
                 .execute();
         User expected = new User("test-id", "test-version", "John", null);
-        User actual = userDAO.getUser("test-id", "Basic dGVzdC1pZDpqb2hucy1wYXNzd29yZA==");
+        User actual = userDAO.getUser("test-id");
         assertThat(actual).isEqualTo(expected);
     }
 
     @Test
-    public void testTryToGetUserWithWrongPassword() {
+    public void testAuthenticateUser() {
+        String hashedPassword = hashPasswordWithSalt("johns-password", "abcd");
+        System.out.println("before writen to db hashed password = " + hashedPassword);
+        dslContext.insertInto(table("user_account"))
+                .set(field("id"), "test-id")
+                .set(field("version"), "test-version")
+                .set(field("name"), "John")
+                .set(field("hashed_password"), hashedPassword)
+                .set(field("salt"), "abcd")
+                .execute();
+        User expected = new User("test-id", "test-version", "John", null);
+        User actual = userDAO.authenticate("test-id", "Basic dGVzdC1pZDpqb2hucy1wYXNzd29yZA==");
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    public void testTryToAuthenticateUserWithWrongPassword() {
         String hashedPassword = hashPasswordWithSalt("johns-password", "abcd");
         System.out.println("before writen to db hashed password = " + hashedPassword);
         dslContext.insertInto(table("user_account"))
@@ -96,7 +112,7 @@ public class UserDAOTest extends TestWithDB {
                 .set(field("salt"), Base64.getEncoder().encode("abcd".getBytes(StandardCharsets.UTF_8)))
                 .execute();
         assertThatThrownBy(() -> {
-            userDAO.getUser("test-id", makeAuth("test-id", "wrong-password"));
+            userDAO.authenticate("test-id", makeAuth("test-id", "wrong-password"));
         }).isInstanceOf(ApplicationException.class).hasMessage("Wrong credentials.");
 
     }
@@ -612,26 +628,26 @@ public class UserDAOTest extends TestWithDB {
     }
 
     @Test
-    public void testGetUserByAuth() {
+    public void testAuthenticateByAuth() {
         User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
         User otherUser = userDAO.addUser(new User(null, null, "Joe", "joes-password"));
         String auth = makeAuth(addedUser.getId(), "johns-password");
         User expected = new User(addedUser.getId(), addedUser.getVersion(), "John", null);
-        User actual = userDAO.getUserByAuth(auth);
+        User actual = userDAO.authenticate(auth);
         assertThat(actual).isEqualTo(expected);
     }
 
     @Test
-    public void testTryGettingUserByAuthWithWrongPassword() {
+    public void testTryAuthenticateByAuthWithWrongPassword() {
         User addedUser = userDAO.addUser(new User(null, null, "John", "johns-password"));
         User otherUser = userDAO.addUser(new User(null, null, "Joe", "joes-password"));
         String auth = makeAuth(addedUser.getId(), "wrong-password");
         assertThatThrownBy(() -> {
-            userDAO.getUserByAuth(auth);
+            userDAO.authenticate(auth);
         }).isInstanceOf(ApplicationException.class).hasMessage("Wrong credentials.");
     }
 
-    private String makeAuth(String id, String password) {
+    public static String makeAuth(String id, String password) {
         return "Basic " + new String(Base64.getEncoder().encode((id + ":" + password).getBytes(StandardCharsets.UTF_8)));
     }
 
