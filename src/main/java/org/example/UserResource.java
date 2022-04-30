@@ -51,6 +51,13 @@ public class UserResource {
     }
 
     @GET
+    @Path("authenticate/{id}")
+    public User authenticate(@PathParam("id") String id, @HeaderParam("Authorization") String auth) throws ApplicationException {
+        User user = userDAO.authenticate(id, auth);
+        return user;
+    }
+
+    @GET
     @Path("get-by-name/{name}")
     @Produces(MediaType.TEXT_PLAIN)
     public String getUserIdByName(@PathParam("name") String name) throws ApplicationException {
