@@ -80,7 +80,21 @@ public class ShoppingListResource {
             throw new ApplicationException("Not authorized.");
         }
         User invitedUser = userDAO.getUser(userId);
-        return shoppingListDAO.invite(invitedUser, shoppingListId);
+        return shoppingListDAO.invite(authenticatedUser, invitedUser, shoppingListId);
+    }
+
+    @GET
+    @Path("get-invitations-by-shopping-list/{shopping-list-id}")
+    public List<User> getInvitationByShoppingList(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        return shoppingListDAO.getInvitationsByShoppingList(authenticatedUser, shoppingListId);
+    }
+
+    @GET
+    @Path("get-invitations/")
+    public List<ShoppingList> getInvitationByUser(@HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        return shoppingListDAO.getInvitationsByUser(authenticatedUser);
     }
 
     @POST
@@ -101,10 +115,6 @@ public class ShoppingListResource {
     @Path("remove-user-from-shopping-list/{shopping-list-id}/{user-id}")
     public List<User> removeUserFromShoppingList(@PathParam("shopping-list-id") String shoppingListId, @PathParam("user-id") String userId, @HeaderParam("Authorization") String auth) {
         User authenticatedUser = userDAO.authenticate(auth);
-//        ShoppingList shoppingList = shoppingListDAO.getShoppingList(authenticatedUser, shoppingListId);
-//        if (!shoppingList.getOwner().equals(authenticatedUser.getId())) {
-//            throw new ApplicationException("Not authorized");
-//        }
         User user = userDAO.getUser(userId);
         return shoppingListDAO.leaveShoppingList(authenticatedUser, user, shoppingListId);
     }

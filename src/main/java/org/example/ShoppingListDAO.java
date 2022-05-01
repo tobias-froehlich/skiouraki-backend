@@ -113,16 +113,29 @@ public class ShoppingListDAO {
         return shoppingList;
     }
 
-    public List<User> getInvitations(String shoppingListId) {
+    public List<User> getInvitationsByShoppingList(User authenticatedUser, String shoppingListId) {
         return dslContext.select()
                 .from("shopping_list_authorization")
                 .join("user_account")
-                .on(field("user_id").equal(field("id")))
+                .on(field("user_id").equal(field("user_account.id")))
+                .join("shopping_list")
+                .on(field("shopping_list_id").equal(field("shopping_list.id")))
                 .where(field("shopping_list_id").eq(shoppingListId))
                 .and(field("invitation_accepted").eq(false))
+                .and(field("owner").eq(authenticatedUser.getId()))
                 .fetch(new UserDAO.UserMapper())
                 .stream().map(userFromDb -> new User(userFromDb.getId(), userFromDb.getVersion(), userFromDb.getName(), null))
                 .collect(Collectors.toList());
+    }
+
+    public List<ShoppingList> getInvitationsByUser(User user) {
+        return dslContext.select()
+                .from("shopping_list")
+                .join("shopping_list_authorization")
+                .on(field("id").eq(field("shopping_list_id")))
+                .where(field("user_id").eq(user.getId()))
+                .and(field("invitation_accepted").eq(false))
+                .fetch(new ShoppingListMapper());
     }
 
     public List<User> getMembers(String shoppingListId) {
@@ -145,7 +158,7 @@ public class ShoppingListDAO {
         return (count != null) && (count > 0);
     }
 
-    public List<User> invite(User invitedUser, String shoppingListId) {
+    public List<User> invite(User authenticatedUser, User invitedUser, String shoppingListId) {
         try {
             dslContext.insertInto(table("shopping_list_authorization"))
                     .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
@@ -154,10 +167,10 @@ public class ShoppingListDAO {
         } catch (DataAccessException e) {
             throw new ApplicationException("Cannot invite user to ShoppingList.");
         }
-        return getInvitations(shoppingListId);
+        return getInvitationsByShoppingList(authenticatedUser, shoppingListId);
     }
 
-    public List<User> withdrawInvitation(User user, String shoppingListId) {
+    public List<User> withdrawInvitation(User authenticatedUser, User user, String shoppingListId) {
         try {
             int count = dslContext.deleteFrom(table("shopping_list_authorization"))
                     .where(field("shopping_list_id").eq(shoppingListId))
@@ -170,7 +183,7 @@ public class ShoppingListDAO {
         } catch (DataAccessException e) {
             throw new ApplicationException("Cannot withdraw invitation.");
         }
-        return getInvitations(shoppingListId);
+        return getInvitationsByShoppingList(authenticatedUser, shoppingListId);
     }
 
     public void acceptInvitation(User user, String shoppingListId) {
