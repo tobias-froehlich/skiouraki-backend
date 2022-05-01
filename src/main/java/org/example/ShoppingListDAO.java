@@ -125,6 +125,17 @@ public class ShoppingListDAO {
                 .collect(Collectors.toList());
     }
 
+    public List<User> getMembers(String shoppingListId) {
+        return dslContext.select()
+                .from("shopping_list_authorization")
+                .join("user_account")
+                .on(field("user_id").equal(field("id")))
+                .where(field("shopping_list_id").eq(shoppingListId))
+                .and(field("invitation_accepted").eq(true))
+                .fetch(new UserDAO.UserMapper())
+                .stream().map(userFromDb -> new User(userFromDb.getId(), userFromDb.getVersion(), userFromDb.getName(), null))
+                .collect(Collectors.toList());
+    }
     public boolean isUserAuthorizedForShoppingList(User user, String shoppingListId) {
         Integer count = dslContext.selectCount().from(table("shopping_list_authorization"))
                 .where(field("shopping_list_id").eq(shoppingListId))
@@ -190,6 +201,49 @@ public class ShoppingListDAO {
         } catch (DataAccessException e) {
             throw new ApplicationException("Cannot reject invitation.");
         }
+    }
+
+    public List<User> leaveShoppingList(User authenticatedUser, User userToLeave, String shoppingListId) {
+        try {
+            int count = 0;
+            if (authenticatedUser.getId().equals(userToLeave.getId())) {
+                count = dslContext.delete(table("shopping_list_authorization"))
+                        .where(field("shopping_list_id").eq(shoppingListId))
+                        .and(field("user_id").eq(userToLeave.getId()))
+                        .and(field("invitation_accepted").eq(true))
+                        .and(field("user_id").notIn(
+                                        dslContext.select(field("owner"))
+                                                .from("shopping_list")
+                                                .where(field("id").eq(shoppingListId))
+                                )
+                        )
+                        .execute();
+            } else {
+                count = dslContext.delete(table("shopping_list_authorization"))
+                        .where(field("shopping_list_id").eq(shoppingListId))
+                        .and(field("user_id").eq(userToLeave.getId()))
+                        .and(field("invitation_accepted").eq(true))
+                        .and(field("user_id").notIn(
+                                        dslContext.select(field("owner"))
+                                                .from("shopping_list")
+                                                .where(field("id").eq(shoppingListId))
+                                )
+                        )
+                        .and(field("shopping_list_id").in(
+                                        dslContext.select(field("id"))
+                                                .from("shopping_List")
+                                                .where(field("owner").eq(authenticatedUser.getId()))
+                                )
+                        )
+                        .execute();
+            }
+            if (count == 0) {
+                throw new ApplicationException("Cannot leave ShoppingList.");
+            }
+        } catch (DataAccessException e){
+                throw new ApplicationException("Cannot leave ShoppingList.");
+        }
+        return getMembers(shoppingListId);
     }
 
     public static class ShoppingListMapper implements RecordMapper<Record, ShoppingList> {

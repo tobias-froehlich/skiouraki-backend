@@ -90,4 +90,23 @@ public class ShoppingListResource {
         shoppingListDAO.acceptInvitation(authenticatedUser, shoppingListId);
     }
 
+    @POST
+    @Path("leave-shopping-list/{shopping-list-id}")
+    public void leaveShoppingList(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        shoppingListDAO.leaveShoppingList(authenticatedUser, authenticatedUser, shoppingListId);
+    }
+
+    @POST
+    @Path("remove-user-from-shopping-list/{shopping-list-id}/{user-id}")
+    public List<User> removeUserFromShoppingList(@PathParam("shopping-list-id") String shoppingListId, @PathParam("user-id") String userId, @HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+//        ShoppingList shoppingList = shoppingListDAO.getShoppingList(authenticatedUser, shoppingListId);
+//        if (!shoppingList.getOwner().equals(authenticatedUser.getId())) {
+//            throw new ApplicationException("Not authorized");
+//        }
+        User user = userDAO.getUser(userId);
+        return shoppingListDAO.leaveShoppingList(authenticatedUser, user, shoppingListId);
+    }
+
 }

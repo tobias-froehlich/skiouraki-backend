@@ -323,6 +323,14 @@ public class ShoppingListDAOTest extends TestWithDB {
                 .execute();
         dslContext.insertInto(table("shopping_list_authorization"))
                 .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-1", "id-jack", true)
+                .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-2", "id-joe", true)
+                .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
                 .values("id-1", "id-john", false)
                 .execute();
         dslContext.insertInto(table("shopping_list_authorization"))
@@ -337,6 +345,44 @@ public class ShoppingListDAOTest extends TestWithDB {
         List<User> expected2 = List.of(JOHN);
         List<User> actual1 = shoppingListDAO.getInvitations("id-1");
         List<User> actual2 = shoppingListDAO.getInvitations("id-2");
+        assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected1);
+        assertThat(actual2).containsExactlyInAnyOrderElementsOf(expected2);
+    }
+
+    @Test
+    public void testGetMembers() {
+        dslContext.insertInto(table("shopping_list"))
+                .columns(field("id"), field("version"), field("name"), field("owner"))
+                .values("id-1", "version-1", "list-name-1", "id-jack")
+                .execute();
+        dslContext.insertInto(table("shopping_list"))
+                .columns(field("id"), field("version"), field("name"), field("owner"))
+                .values("id-2", "version-2", "list-name-2", "id-joe")
+                .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-1", "id-jack", true)
+                .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-2", "id-joe", true)
+                .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-1", "id-john", true)
+                .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-1", "id-joe", false)
+                .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-2", "id-john", true)
+                .execute();
+        List<User> expected1 = List.of(JACK, JOHN);
+        List<User> expected2 = List.of(JOE, JOHN);
+        List<User> actual1 = shoppingListDAO.getMembers("id-1");
+        List<User> actual2 = shoppingListDAO.getMembers("id-2");
         assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected1);
         assertThat(actual2).containsExactlyInAnyOrderElementsOf(expected2);
     }
@@ -537,6 +583,60 @@ public class ShoppingListDAOTest extends TestWithDB {
         userDAO.deleteUser(Jim.getId(), UserDAOTest.makeAuth(Jim.getId(), "jims-password"));
         List<User> invitedUsers = shoppingListDAO.getInvitations(shoppingList.getId());
         assertThat(invitedUsers).hasSize(0);
+    }
+
+    @Test
+    public void testLeaveShoppingList() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JOHN, new ShoppingList("", "", "John's shopping list", ""));
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values(shoppingList.getId(), JOE.getId(), true)
+                .execute();
+        List<User> expected = List.of(JOHN, JOE);
+        List<User> actual = shoppingListDAO.getMembers(shoppingList.getId());
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        List<User> actual1 = shoppingListDAO.leaveShoppingList(JOE, JOE, shoppingList.getId());
+        expected = List.of(JOHN);
+        List<User> actual2 = shoppingListDAO.getMembers(shoppingList.getId());
+        assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(actual2).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    public void testRemoveFromShoppingList() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JOHN, new ShoppingList("", "", "John's shopping list", ""));
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values(shoppingList.getId(), JOE.getId(), true)
+                .execute();
+        List<User> expected = List.of(JOHN, JOE);
+        List<User> actual = shoppingListDAO.getMembers(shoppingList.getId());
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        List<User> actual1 = shoppingListDAO.leaveShoppingList(JOHN, JOE, shoppingList.getId());
+        expected = List.of(JOHN);
+        List<User> actual2 = shoppingListDAO.getMembers(shoppingList.getId());
+        assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(actual2).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    public void tryToLeaveShoppingListAsOwner() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JOHN, new ShoppingList("", "", "John's shopping list", ""));
+        assertThatThrownBy(() -> {
+            shoppingListDAO.leaveShoppingList(JOHN, JOHN, shoppingList.getId());
+        }).isInstanceOf(ApplicationException.class).hasMessage("Cannot leave ShoppingList.");
+    }
+
+    @Test
+    public void testRemoveFromShoppingListAsNotAuthorizedUser() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JOHN, new ShoppingList("", "", "John's shopping list", ""));
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values(shoppingList.getId(), JOE.getId(), true)
+                .execute();
+        assertThatThrownBy(() -> {
+            shoppingListDAO.leaveShoppingList(JACK, JOE, shoppingList.getId());
+        }).isInstanceOf(ApplicationException.class).hasMessage("Cannot leave ShoppingList.");
     }
 
 }
