@@ -105,6 +105,13 @@ public class ShoppingListResource {
     }
 
     @POST
+    @Path("reject-invitation/{shopping-list-id}")
+    public void rejectInvitation(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        shoppingListDAO.rejectInvitation(authenticatedUser, shoppingListId);
+    }
+
+    @POST
     @Path("leave-shopping-list/{shopping-list-id}")
     public void leaveShoppingList(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth) {
         User authenticatedUser = userDAO.authenticate(auth);
