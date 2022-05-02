@@ -259,6 +259,36 @@ public class ShoppingListDAO {
         return getMembers(shoppingListId);
     }
 
+    public EnrichedShoppingList getEnrichedShoppingList(User authenticatedUser, String shoppingListId) {
+        ShoppingList shoppingList = getShoppingList(authenticatedUser, shoppingListId);
+        List<User> members = dslContext.select()
+                .from("shopping_list_authorization")
+                .join("user_account")
+                .on(field("shopping_list_authorization.user_id").eq(field("user_account.id")))
+                .where(field("shopping_list_id").eq(shoppingListId))
+                .and(field("invitation_accepted").eq(true))
+                .fetch(new UserDAO.UserMapper())
+                .stream().map(userFromDb -> new User(userFromDb.getId(), userFromDb.getVersion(), userFromDb.getName(), null))
+                .collect(Collectors.toList());
+        List<User> invitedUsers = dslContext.select()
+                .from("shopping_list_authorization")
+                .join("user_account")
+                .on(field("shopping_list_authorization.user_id").eq(field("user_account.id")))
+                .where(field("shopping_list_id").eq(shoppingListId))
+                .and(field("invitation_accepted").eq(false))
+                .fetch(new UserDAO.UserMapper())
+                .stream().map(userFromDb -> new User(userFromDb.getId(), userFromDb.getVersion(), userFromDb.getName(), null))
+                .collect(Collectors.toList());
+        return new EnrichedShoppingList(
+                shoppingList.getId(),
+                shoppingList.getVersion(),
+                shoppingList.getName(),
+                shoppingList.getOwner(),
+                members,
+                invitedUsers
+        );
+    }
+
     public static class ShoppingListMapper implements RecordMapper<Record, ShoppingList> {
         @Override
         public ShoppingList map(Record record) {

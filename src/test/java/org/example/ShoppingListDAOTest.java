@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
+import java.util.HashSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -676,6 +677,51 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThatThrownBy(() -> {
             shoppingListDAO.leaveShoppingList(JACK, JOE, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot leave ShoppingList.");
+    }
+
+    @Test
+    public void testGetEnrichedShoppingList() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList expected = new EnrichedShoppingList(
+                shoppingList.getId(),
+                shoppingList.getVersion(),
+                "Jack's shopping list",
+                JACK.getId(),
+                List.of(JACK),
+                List.of());
+        EnrichedShoppingList actual = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    public void testGetEnrichedShoppingListWithFurtherMembersAndInvitedUsers() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.invite(JACK, JOE, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        EnrichedShoppingList expected = new EnrichedShoppingList(
+                shoppingList.getId(),
+                shoppingList.getVersion(),
+                "Jack's shopping list",
+                JACK.getId(),
+                List.of(JACK, JOHN),
+                List.of(JOE));
+        EnrichedShoppingList actual1 = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(actual1).isEqualTo(expected);
+        EnrichedShoppingList actual2 = shoppingListDAO.getEnrichedShoppingList(JOHN, shoppingList.getId());
+        assertThat(actual2).isEqualTo(expected);
+    }
+
+    @Test
+    public void testTryToGetEnrichedShoppingListAsNotAuthorizedUser() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        assertThatThrownBy(() -> {
+            shoppingListDAO.getEnrichedShoppingList(JOHN, shoppingList.getId());
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+        assertThatThrownBy(() -> {
+            shoppingListDAO.getEnrichedShoppingList(JOE, shoppingList.getId());
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
     }
 
 }
