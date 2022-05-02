@@ -426,6 +426,10 @@ public class ShoppingListDAOTest extends TestWithDB {
                 .execute();
         List<User> expected = List.of(JOHN);
         List<User> actual = shoppingListDAO.invite(JACK, JOHN, "id-1");
+        String newVersion = dslContext.selectFrom("shopping_list")
+                .where(field("id").eq("id-1"))
+                .fetchOne(new ShoppingListDAO.ShoppingListMapper()).getVersion();
+        assertThat(newVersion).isNotEqualTo("version-1");
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         actual = shoppingListDAO.getInvitationsByShoppingList(JACK, "id-1");
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
@@ -451,10 +455,17 @@ public class ShoppingListDAOTest extends TestWithDB {
                 .columns(field("id"), field("version"), field("name"), field("owner"))
                 .values("id-1", "version-1", "list-name-1", "id-jack")
                 .execute();
+        dslContext.insertInto(table("shopping_list_authorization"))
+                .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
+                .values("id-1", "id-jack", true)
+                .execute();
         shoppingListDAO.invite(JACK, JOHN, "id-1");
+        String oldVersion = shoppingListDAO.getShoppingList(JACK, "id-1").getVersion();
         assertThatThrownBy(() -> {
             shoppingListDAO.invite(JACK, JOHN, "id-1");
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot invite user to ShoppingList.");
+        String newVersion = shoppingListDAO.getShoppingList(JACK, "id-1").getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
     }
 
     @Test
@@ -469,7 +480,10 @@ public class ShoppingListDAOTest extends TestWithDB {
         expected = List.of(JOE);
         actual = shoppingListDAO.getInvitationsByShoppingList(JACK, shoppingList.getId());
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        String oldVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
         shoppingListDAO.withdrawInvitation(JACK, JOE, shoppingList.getId());
+        String newVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
         expected = List.of();
         actual = shoppingListDAO.getInvitationsByShoppingList(JACK, shoppingList.getId());
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
@@ -478,17 +492,23 @@ public class ShoppingListDAOTest extends TestWithDB {
     @Test
     public void testTryToWithdrawInvitationThatDoesNotExist() {
         ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's shopping list", null));
+        String oldVersion = shoppingList.getVersion();
         assertThatThrownBy(() -> {
             shoppingListDAO.withdrawInvitation(JACK, JOHN, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot withdraw invitation because it was not found.");
+        String newVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
     }
 
     @Test
     public void testTryToInviteTheOwner() {
         ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's shopping list", null));
+        String oldVersion = shoppingList.getVersion();
         assertThatThrownBy(() -> {
             shoppingListDAO.invite(JACK, JACK, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot invite user to ShoppingList.");
+        String newVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
     }
 
     @Test
@@ -507,9 +527,12 @@ public class ShoppingListDAOTest extends TestWithDB {
     @Test
     public void testTryToAcceptInvitationThatDoesNotExist() {
         ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's shopping list", null));
+        String oldVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
         assertThatThrownBy(() -> {
             shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("Invitation not found.");
+        String newVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
     }
 
     @Test
@@ -535,9 +558,12 @@ public class ShoppingListDAOTest extends TestWithDB {
         ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's shopping list", null));
         shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
         shoppingListDAO.invite(JACK, JOE, shoppingList.getId());
+        String oldVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
         assertThatThrownBy(() -> {
             shoppingListDAO.rejectInvitation(JACK, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot reject invitation.");
+        String newVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
     }
 
     @Test
@@ -546,8 +572,16 @@ public class ShoppingListDAOTest extends TestWithDB {
         ShoppingList shoppingList2 = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's other shopping list", null));
         shoppingListDAO.invite(JACK, JOHN, shoppingList1.getId());
         shoppingListDAO.invite(JACK, JOHN, shoppingList2.getId());
+        String oldVersion1 = shoppingListDAO.getShoppingList(JACK, shoppingList1.getId()).getVersion();
+        String oldVersion2 = shoppingListDAO.getShoppingList(JACK, shoppingList2.getId()).getVersion();
         shoppingListDAO.acceptInvitation(JOHN, shoppingList1.getId());
         shoppingListDAO.acceptInvitation(JOHN, shoppingList2.getId());
+        String newVersion1 = shoppingListDAO.getShoppingList(JACK, shoppingList1.getId()).getVersion();
+        String newVersion2 = shoppingListDAO.getShoppingList(JACK, shoppingList2.getId()).getVersion();
+        assertThat(newVersion1).isNotEqualTo(oldVersion1);
+        assertThat(newVersion2).isNotEqualTo(oldVersion2);
+        shoppingList1.setVersion(newVersion1);
+        shoppingList2.setVersion(newVersion2);
         List<ShoppingList> expected = List.of(shoppingList1, shoppingList2);
         List<ShoppingList> actual = shoppingListDAO.getShoppingLists(JOHN);
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
@@ -559,8 +593,15 @@ public class ShoppingListDAOTest extends TestWithDB {
         ShoppingList shoppingList2 = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's other shopping list", null));
         shoppingListDAO.invite(JACK, JOHN, shoppingList1.getId());
         shoppingListDAO.invite(JACK, JOHN, shoppingList2.getId());
+        String oldVersion1 = shoppingListDAO.getShoppingList(JACK, shoppingList1.getId()).getVersion();
+        String oldVersion2 = shoppingListDAO.getShoppingList(JACK, shoppingList2.getId()).getVersion();
         shoppingListDAO.acceptInvitation(JOHN, shoppingList1.getId());
         shoppingListDAO.rejectInvitation(JOHN, shoppingList2.getId());
+        String newVersion1 = shoppingListDAO.getShoppingList(JACK, shoppingList1.getId()).getVersion();
+        String newVersion2 = shoppingListDAO.getShoppingList(JACK, shoppingList2.getId()).getVersion();
+        assertThat(newVersion1).isNotEqualTo(oldVersion1);
+        assertThat(newVersion2).isNotEqualTo(oldVersion2);
+        shoppingList1.setVersion(newVersion1);
         List<ShoppingList> expected = List.of(shoppingList1);
         List<ShoppingList> actual = shoppingListDAO.getShoppingLists(JOHN);
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
@@ -568,11 +609,13 @@ public class ShoppingListDAOTest extends TestWithDB {
 
     @Test
     public void testGetShoppingListAfterAcceptingInvitation() {
-        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's shopping list", null));
-        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
-        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
-        ShoppingList actual = shoppingListDAO.getShoppingList(JOHN, shoppingList.getId());
-        assertThat(actual).isEqualTo(shoppingList);
+        ShoppingList expected = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's shopping list", null));
+        shoppingListDAO.invite(JACK, JOHN, expected.getId());
+        shoppingListDAO.acceptInvitation(JOHN, expected.getId());
+        ShoppingList actual = shoppingListDAO.getShoppingList(JOHN, expected.getId());
+        assertThat(actual.getVersion()).isNotEqualTo(expected.getVersion());
+        expected.setVersion(actual.getVersion());
+        assertThat(actual).isEqualTo(expected);
     }
 
     @Test
@@ -589,9 +632,12 @@ public class ShoppingListDAOTest extends TestWithDB {
         ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList(null, null, "Jack's shopping list", null));
         shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
         shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        String oldVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
         assertThatThrownBy(() -> {
             shoppingListDAO.deleteShoppingList(JOHN, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot delete ShoppingList.");
+        String newVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
     }
 
     @Test
@@ -635,7 +681,10 @@ public class ShoppingListDAOTest extends TestWithDB {
         List<User> expected = List.of(JOHN, JOE);
         List<User> actual = shoppingListDAO.getMembers(shoppingList.getId());
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        String oldVersion = shoppingListDAO.getShoppingList(JOHN, shoppingList.getId()).getVersion();
         List<User> actual1 = shoppingListDAO.leaveShoppingList(JOE, JOE, shoppingList.getId());
+        String newVersion = shoppingListDAO.getShoppingList(JOHN, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
         expected = List.of(JOHN);
         List<User> actual2 = shoppingListDAO.getMembers(shoppingList.getId());
         assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected);
@@ -652,7 +701,10 @@ public class ShoppingListDAOTest extends TestWithDB {
         List<User> expected = List.of(JOHN, JOE);
         List<User> actual = shoppingListDAO.getMembers(shoppingList.getId());
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        String oldVersion = shoppingListDAO.getShoppingList(JOHN, shoppingList.getId()).getVersion();
         List<User> actual1 = shoppingListDAO.leaveShoppingList(JOHN, JOE, shoppingList.getId());
+        String newVersion = shoppingListDAO.getShoppingList(JOHN, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
         expected = List.of(JOHN);
         List<User> actual2 = shoppingListDAO.getMembers(shoppingList.getId());
         assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected);
@@ -665,6 +717,8 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThatThrownBy(() -> {
             shoppingListDAO.leaveShoppingList(JOHN, JOHN, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot leave ShoppingList.");
+        String newVersion = shoppingListDAO.getShoppingList(JOHN, shoppingList.getId()).getVersion();
+        assertThat(newVersion).isEqualTo(shoppingList.getVersion());
     }
 
     @Test
@@ -699,9 +753,10 @@ public class ShoppingListDAOTest extends TestWithDB {
         shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
         shoppingListDAO.invite(JACK, JOE, shoppingList.getId());
         shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        String newVersion = shoppingListDAO.getShoppingList(JACK, shoppingList.getId()).getVersion();
         EnrichedShoppingList expected = new EnrichedShoppingList(
                 shoppingList.getId(),
-                shoppingList.getVersion(),
+                newVersion,
                 "Jack's shopping list",
                 JACK.getId(),
                 List.of(JACK, JOHN),

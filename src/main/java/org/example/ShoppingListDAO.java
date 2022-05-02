@@ -164,9 +164,13 @@ public class ShoppingListDAO {
                     .columns(field("shopping_list_id"), field("user_id"), field("invitation_accepted"))
                     .values(shoppingListId, invitedUser.getId(), false)
                     .execute();
+
         } catch (DataAccessException e) {
             throw new ApplicationException("Cannot invite user to ShoppingList.");
         }
+            dslContext.update(table("shopping_list"))
+                .set(field("version"), UUID.randomUUID().toString())
+                .execute();
         return getInvitationsByShoppingList(authenticatedUser, shoppingListId);
     }
 
@@ -180,6 +184,9 @@ public class ShoppingListDAO {
             if (count == 0) {
                 throw new ApplicationException("Cannot withdraw invitation because it was not found.");
             }
+            dslContext.update(table("shopping_list"))
+                    .set(field("version"), UUID.randomUUID().toString())
+                    .execute();
         } catch (DataAccessException e) {
             throw new ApplicationException("Cannot withdraw invitation.");
         }
@@ -196,6 +203,9 @@ public class ShoppingListDAO {
             if (count == 0) {
                 throw new ApplicationException("Invitation not found.");
             }
+            dslContext.update(table("shopping_list"))
+                    .set(field("version"), UUID.randomUUID().toString())
+                    .execute();
         } catch (DataAccessException e) {
             throw new ApplicationException("Cannot accept invitation.");
         }
@@ -211,6 +221,9 @@ public class ShoppingListDAO {
             if (count == 0) {
                 throw new ApplicationException("Cannot reject invitation.");
             }
+            dslContext.update(table("shopping_list"))
+                    .set(field("version"), UUID.randomUUID().toString())
+                    .execute();
         } catch (DataAccessException e) {
             throw new ApplicationException("Cannot reject invitation.");
         }
@@ -230,6 +243,12 @@ public class ShoppingListDAO {
                                                 .where(field("id").eq(shoppingListId))
                                 )
                         )
+                        .execute();
+                if (count == 0) {
+                    throw new ApplicationException("Cannot leave ShoppingList.");
+                }
+                dslContext.update(table("shopping_list"))
+                        .set(field("version"), UUID.randomUUID().toString())
                         .execute();
             } else {
                 count = dslContext.delete(table("shopping_list_authorization"))
@@ -253,6 +272,9 @@ public class ShoppingListDAO {
             if (count == 0) {
                 throw new ApplicationException("Cannot leave ShoppingList.");
             }
+            dslContext.update(table("shopping_list"))
+                    .set(field("version"), UUID.randomUUID().toString())
+                    .execute();
         } catch (DataAccessException e){
                 throw new ApplicationException("Cannot leave ShoppingList.");
         }
