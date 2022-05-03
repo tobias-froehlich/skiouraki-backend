@@ -126,4 +126,11 @@ public class ShoppingListResource {
         return shoppingListDAO.leaveShoppingList(authenticatedUser, user, shoppingListId);
     }
 
+    @GET
+    @Path("get-enriched/{shopping-list-id}")
+    public EnrichedShoppingList getEnriched(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth) {
+        User authenticatedUser = userDAO.authenticate(auth);
+        return shoppingListDAO.getEnrichedShoppingList(authenticatedUser, shoppingListId);
+    }
+
 }
