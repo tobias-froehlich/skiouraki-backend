@@ -145,14 +145,14 @@ public class ShoppingListResource {
         return shoppingListDAO.getEnrichedShoppingList(authenticatedUser, shoppingListId);
     }
 
-    @GET
+    @POST
     @Path("add-item/{shopping-list-id}")
     public EnrichedShoppingList addItem(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth, ShoppingListItem item) {
         User authenticatedUser = userDAO.authenticate(auth);
         return shoppingListDAO.addShoppingListItem(authenticatedUser, shoppingListId, item);
     }
 
-    @GET
+    @POST
     @Path("remove-item/{shopping-list-id}")
     public EnrichedShoppingList removeItem(@PathParam("shopping-list-id") String shoppingListId, @HeaderParam("Authorization") String auth, ShoppingListItem item) {
         User authenticatedUser = userDAO.authenticate(auth);
