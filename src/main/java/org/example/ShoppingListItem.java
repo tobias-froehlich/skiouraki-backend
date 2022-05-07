@@ -13,6 +13,9 @@ public class ShoppingListItem {
     private String boughtBy;
     private String stateChangedBy;
 
+    private static final int MIN_NAME_LENGTH = 1;
+    private static final int MAX_NAME_LENGTH = 32;
+
     public ShoppingListItem(@JsonProperty("id") String id,
                             @JsonProperty("version") String version,
                             @JsonProperty("name") String name,
@@ -83,6 +86,10 @@ public class ShoppingListItem {
 
     public void setStateChangedBy(String stateChangedBy) {
         this.stateChangedBy = stateChangedBy;
+    }
+
+    public static boolean isNameValid(String name) {
+        return (name.length() >= MIN_NAME_LENGTH) && (name.length() <= MAX_NAME_LENGTH);
     }
 
     @Override

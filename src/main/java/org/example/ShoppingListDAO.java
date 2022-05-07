@@ -327,6 +327,9 @@ public class ShoppingListDAO {
         if (count == 0) {
             throw new ApplicationException("ShoppingList not found.");
         }
+        if (!ShoppingListItem.isNameValid(shoppingListItem.getName())) {
+            throw new ApplicationException("Invalid name.");
+        }
         dslContext.insertInto(table("shopping_list_item"))
                 .columns(
                         field("id"),

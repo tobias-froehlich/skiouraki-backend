@@ -1080,4 +1080,59 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThat(enrichedShoppingList.getItems()).hasSize(1);
     }
 
+    @Test
+    public void testAddItemWithMaximalLengthName() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "12345678901234567890123456789012", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+    }
+
+    @Test
+    public void testAddItemWithMinimalLengthName() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "1", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+    }
+
+    @Test
+    public void testTryToAddItemWithTooLongName() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        assertThatThrownBy(() -> {
+            shoppingListDAO.addShoppingListItem(
+                    JACK,
+                    shoppingList.getId(),
+                    new ShoppingListItem("", "", "123456789012345678901234567890123", "", "", "", "")
+            );
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid name.");
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(0);
+    }
+
+    @Test
+    public void testTryToAddItemWithTooShortName() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        assertThatThrownBy(() -> {
+            shoppingListDAO.addShoppingListItem(
+                    JACK,
+                    shoppingList.getId(),
+                    new ShoppingListItem("", "", "", "", "", "", "")
+            );
+        }).isInstanceOf(ApplicationException.class).hasMessage("Invalid name.");
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(0);
+    }
+
+
 }
