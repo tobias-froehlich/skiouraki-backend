@@ -1134,5 +1134,239 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThat(enrichedShoppingList.getItems()).hasSize(0);
     }
 
+    @Test
+    public void testSetItemToBoughtAsOwner() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        String oldVersion = enrichedShoppingList.getVersion();
+        enrichedShoppingList = shoppingListDAO.setBought(JACK, shoppingList.getId(), item);
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        item = enrichedShoppingList.getItems().get(0);
+        assertThat(item.getBoughtBy()).isEqualTo(JACK.getId());
+        assertThat(item.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testSetItemToBoughtAsNormalMember() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        String oldVersion = enrichedShoppingList.getVersion();
+        enrichedShoppingList = shoppingListDAO.setBought(JOHN, shoppingList.getId(), item);
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        item = enrichedShoppingList.getItems().get(0);
+        assertThat(item.getBoughtBy()).isEqualTo(JOHN.getId());
+        assertThat(item.getStateChangedBy()).isEqualTo(JOHN.getId());
+    }
+
+    @Test
+    public void testSetItemToUnboughtAsOwner() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        enrichedShoppingList = shoppingListDAO.setBought(JACK, shoppingList.getId(), item);
+        item = enrichedShoppingList.getItems().get(0);
+        String oldVersion = enrichedShoppingList.getVersion();
+        enrichedShoppingList = shoppingListDAO.setUnbought(JACK, shoppingList.getId(), item);
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        item = enrichedShoppingList.getItems().get(0);
+        assertThat(item.getBoughtBy()).isNull();
+        assertThat(item.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testSetItemToUnboughtAsNormalMember() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        enrichedShoppingList = shoppingListDAO.setBought(JACK, shoppingList.getId(), item);
+        item = enrichedShoppingList.getItems().get(0);
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        String oldVersion = enrichedShoppingList.getVersion();
+        enrichedShoppingList = shoppingListDAO.setUnbought(JOHN, shoppingList.getId(), item);
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        item = enrichedShoppingList.getItems().get(0);
+        assertThat(item.getBoughtBy()).isNull();
+        assertThat(item.getStateChangedBy()).isEqualTo(JOHN.getId());
+    }
+
+    @Test
+    public void testTrySetItemToBoughtAsOwnerWhenItIsBoughtAlready() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        final ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        enrichedShoppingList = shoppingListDAO.setBought(JACK, shoppingList.getId(), item);
+        String oldVersion = enrichedShoppingList.getVersion();
+        assertThatThrownBy(() -> {
+                    shoppingListDAO.setBought(JACK, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Cannot set ShoppingListItem to state bought.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem newItem = enrichedShoppingList.getItems().get(0);
+        assertThat(newItem.getBoughtBy()).isEqualTo(JACK.getId());
+        assertThat(newItem.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testTrySetItemToBoughtAsNormalMemberWhenItIsBoughtAlready() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        final ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        enrichedShoppingList = shoppingListDAO.setBought(JACK, shoppingList.getId(), item);
+        String oldVersion = enrichedShoppingList.getVersion();
+        assertThatThrownBy(() -> {
+            shoppingListDAO.setBought(JOHN, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Cannot set ShoppingListItem to state bought.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem newItem = enrichedShoppingList.getItems().get(0);
+        assertThat(newItem.getBoughtBy()).isEqualTo(JACK.getId());
+        assertThat(newItem.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testTrySetItemToUnboughtAsOwnerWhenItIsNotBoughtAlready() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        final ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        String oldVersion = enrichedShoppingList.getVersion();
+        assertThatThrownBy(() -> {
+            shoppingListDAO.setUnbought(JACK, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Cannot set ShoppingListItem to state unbought.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem newItem = enrichedShoppingList.getItems().get(0);
+        assertThat(newItem.getBoughtBy()).isNull();
+        assertThat(newItem.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testTrySetItemToUnboughtAsNormalMemberWhenItIsNotBoughtAlready() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        final ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        String oldVersion = enrichedShoppingList.getVersion();
+        assertThatThrownBy(() -> {
+            shoppingListDAO.setUnbought(JOHN, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Cannot set ShoppingListItem to state unbought.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem newItem = enrichedShoppingList.getItems().get(0);
+        assertThat(newItem.getBoughtBy()).isNull();
+        assertThat(newItem.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testTrySetItemToBoughtWithoutAuthorization() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        final ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        String oldVersion = enrichedShoppingList.getVersion();
+        assertThatThrownBy(() -> {
+            shoppingListDAO.setBought(JOHN, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem newItem = enrichedShoppingList.getItems().get(0);
+        assertThat(newItem.getBoughtBy()).isNull();
+        assertThat(newItem.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testTrySetItemToUnboughtWithoutAuthorization() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        final ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        enrichedShoppingList = shoppingListDAO.setBought(JACK, shoppingList.getId(), item);
+        String oldVersion = enrichedShoppingList.getVersion();
+        assertThatThrownBy(() -> {
+            shoppingListDAO.setBought(JOHN, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem newItem = enrichedShoppingList.getItems().get(0);
+        assertThat(newItem.getBoughtBy()).isEqualTo(JACK.getId());
+        assertThat(newItem.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
 
 }

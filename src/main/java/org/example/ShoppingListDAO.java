@@ -378,6 +378,48 @@ public class ShoppingListDAO {
         return getEnrichedShoppingList(authenticatedUser, shoppingListId);
     }
 
+    public EnrichedShoppingList setBought(User authenticatedUser, String shoppingListId, ShoppingListItem shoppingListItem) {
+        getShoppingList(authenticatedUser, shoppingListId);
+        dslContext.transaction(configuration -> {
+            DSL.using(configuration).update(table("shopping_list"))
+                    .set(field("version"), UUID.randomUUID().toString())
+                    .where(field("id").eq(shoppingListId))
+                    .execute();
+            int count = DSL.using(configuration).update(table("shopping_list_item"))
+                    .set(field("bought_by"), authenticatedUser.getId())
+                    .set(field("state_changed_by"), authenticatedUser.getId())
+                    .where(field("shopping_list_id").eq(shoppingListId))
+                    .and(field("id").eq(shoppingListItem.getId()))
+                    .and(field("bought_by").isNull())
+                    .execute();
+            if (count == 0) {
+                throw new ApplicationException("Cannot set ShoppingListItem to state bought.");
+            }
+        });
+        return getEnrichedShoppingList(authenticatedUser, shoppingListId);
+    }
+
+    public EnrichedShoppingList setUnbought(User authenticatedUser, String shoppingListId, ShoppingListItem shoppingListItem) {
+        getShoppingList(authenticatedUser, shoppingListId);
+        dslContext.transaction(configuration -> {
+            DSL.using(configuration).update(table("shopping_list"))
+                    .set(field("version"), UUID.randomUUID().toString())
+                    .where(field("id").eq(shoppingListId))
+                    .execute();
+            int count = DSL.using(configuration).update(table("shopping_list_item"))
+                    .setNull(field("bought_by"))
+                    .set(field("state_changed_by"), authenticatedUser.getId())
+                    .where(field("shopping_list_id").eq(shoppingListId))
+                    .and(field("id").eq(shoppingListItem.getId()))
+                    .and(field("bought_by").isNotNull())
+                    .execute();
+            if (count == 0) {
+                throw new ApplicationException("Cannot set ShoppingListItem to state unbought.");
+            }
+        });
+        return getEnrichedShoppingList(authenticatedUser, shoppingListId);
+    }
+
     public static class ShoppingListMapper implements RecordMapper<Record, ShoppingList> {
         @Override
         public ShoppingList map(Record record) {
