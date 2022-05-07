@@ -6,7 +6,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-import java.util.HashSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -990,7 +989,7 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThat(enrichedShoppingList.getItems()).hasSize(1);
         ShoppingListItem item = enrichedShoppingList.getItems().get(0);
         String oldVersion = enrichedShoppingList.getVersion();
-        enrichedShoppingList = shoppingListDAO.removeItem(JACK, shoppingList.getId(), item);
+        enrichedShoppingList = shoppingListDAO.removeShoppingListItem(JACK, shoppingList.getId(), item);
         String newVersion = enrichedShoppingList.getVersion();
         assertThat(newVersion).isNotEqualTo(oldVersion);
         assertThat(enrichedShoppingList.getItems()).hasSize(0);
@@ -1011,7 +1010,7 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThat(enrichedShoppingList.getItems()).hasSize(1);
         ShoppingListItem item = enrichedShoppingList.getItems().get(0);
         assertThatThrownBy(() -> {
-                    shoppingListDAO.removeItem(JOHN, shoppingList.getId(), item);
+                    shoppingListDAO.removeShoppingListItem(JOHN, shoppingList.getId(), item);
         }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
         enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
         assertThat(enrichedShoppingList.getItems()).hasSize(1);
@@ -1031,7 +1030,7 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThat(enrichedShoppingList.getItems()).hasSize(1);
         ShoppingListItem item = enrichedShoppingList.getItems().get(0);
         assertThatThrownBy(() -> {
-            shoppingListDAO.removeItem(JOHN, shoppingList.getId(), item);
+            shoppingListDAO.removeShoppingListItem(JOHN, shoppingList.getId(), item);
         }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
         enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
         assertThat(enrichedShoppingList.getItems()).hasSize(1);
@@ -1052,7 +1051,7 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThat(enrichedShoppingList.getItems()).hasSize(1);
         ShoppingListItem item = enrichedShoppingList.getItems().get(0);
         String oldVersion = enrichedShoppingList.getVersion();
-        enrichedShoppingList = shoppingListDAO.removeItem(JOHN, shoppingList.getId(), item);
+        enrichedShoppingList = shoppingListDAO.removeShoppingListItem(JOHN, shoppingList.getId(), item);
         String newVersion = enrichedShoppingList.getVersion();
         assertThat(newVersion).isNotEqualTo(oldVersion);
         assertThat(enrichedShoppingList.getItems()).hasSize(0);
@@ -1075,7 +1074,7 @@ public class ShoppingListDAOTest extends TestWithDB {
                 .where(field("id").eq(outdatedItem.getId()))
                 .execute();
         assertThatThrownBy(() -> {
-            shoppingListDAO.removeItem(JACK, shoppingList.getId(), outdatedItem);
+            shoppingListDAO.removeShoppingListItem(JACK, shoppingList.getId(), outdatedItem);
         }).isInstanceOf(ApplicationException.class).hasMessage("Cannot remove ShoppingListItem.");
         enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
         assertThat(enrichedShoppingList.getItems()).hasSize(1);

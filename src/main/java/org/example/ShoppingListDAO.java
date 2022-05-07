@@ -356,7 +356,7 @@ public class ShoppingListDAO {
         return getEnrichedShoppingList(authenticatedUser, shoppingListId);
     }
 
-    public EnrichedShoppingList removeItem(User authenticatedUser, String shoppingListId, ShoppingListItem item) {
+    public EnrichedShoppingList removeShoppingListItem(User authenticatedUser, String shoppingListId, ShoppingListItem item) {
         getShoppingList(authenticatedUser, shoppingListId);
         int count = dslContext.update(table("shopping_list"))
                 .set(field("version"), UUID.randomUUID())
