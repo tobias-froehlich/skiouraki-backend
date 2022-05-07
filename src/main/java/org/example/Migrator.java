@@ -107,10 +107,56 @@ public class Migrator {
                     )
                     .execute();
         }));
+        migrationSteps.add(new MigrationStep("Shopping list item table", ctx -> {
+            ctx.createTableIfNotExists("shopping_list_item")
+                    .column("id", VARCHAR(36))
+                    .column("version", VARCHAR(36))
+                    .column("name", VARCHAR(32))
+                    .column("created_by", VARCHAR(36))
+                    .column("modified_by", VARCHAR(36))
+                    .column("bought_by", VARCHAR(36))
+                    .column("state_changed_by", VARCHAR(36))
+                    .column("shopping_list_id", VARCHAR(36))
+                    .column("sort_order", INTEGER)
+                    .execute();
+            ctx.alterTable("shopping_list_item")
+                    .alterColumn("id")
+                    .setNotNull()
+                    .execute();
+            ctx.alterTable("shopping_list_item")
+                    .add(
+                            DSL.constraint("pk_shopping_list_item").primaryKey("id")
+                    )
+                    .execute();
+            ctx.alterTable("shopping_list_item")
+                    .add(
+                            DSL.constraint("fk_shopping_list_item_shopping_list").foreignKey("shopping_list_id").references("shopping_list", "id")
+                    )
+                    .execute();
+        }));
+//        migrationSteps.add(new MigrationStep("Shopping list item 1:N table", ctx -> {
+//            ctx.createTableIfNotExists("shopping_list_shopping_list_item")
+//                    .column("shopping_list_id", VARCHAR(36))
+//                    .column("item_id", VARCHAR(36))
+//                    .column("sort_order", INTEGER)
+//                    .execute();
+//            ctx.alterTable("shopping_list_shopping_list_item")
+//                    .add(
+//                            DSL.constraint("fk_shopping_list_shopping_list_item_shopping_list").foreignKey("shopping_list_id").references("shopping_list", "id")
+//                    )
+//                    .execute();
+//            ctx.alterTable("shopping_list_shopping_list_item")
+//                    .add(
+//                            DSL.constraint("fk_shopping_list_shopping_list_item_item").foreignKey("item_id").references("shopping_list_item", "id")
+//                    )
+//                    .execute();
+//        }));
     }
 
     public void reset() {
         dslContext.dropTableIfExists("migration").execute();
+        dslContext.dropTableIfExists("shopping_list_shopping_list_item").execute();
+        dslContext.dropTableIfExists("shopping_list_item").execute();
         dslContext.dropTableIfExists("shopping_list_authorization").execute();
         dslContext.dropTableIfExists("shopping_list").execute();
         dslContext.dropTableIfExists("user_account").execute();

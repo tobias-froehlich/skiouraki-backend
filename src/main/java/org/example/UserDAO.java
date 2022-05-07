@@ -148,11 +148,23 @@ public class UserDAO {
         User authenticatedUser = authenticate(id, auth);
         dslContext.transaction(configuration -> {
             DSLContext ctx = DSL.using(configuration);
+            List<String> shoppingListIds = ctx.select(field("id"))
+                    .from("shopping_list")
+                    .where(field("owner").eq(id))
+                    .fetch(record -> record.getValue("id", String.class));
+//            List<String> itemIds = ctx.select(field("item_id"))
+//                    .from("shopping_list_shopping_list_item")
+//                    .where(field("shopping_list_id").in(shoppingListIds))
+//                    .fetch(record -> record.getValue("id", String.class));
+//            ctx.deleteFrom(table("shopping_list_shopping_list_item"))
+//                    .where(field("shopping_list_id").in(shoppingListIds))
+//                    .execute();
+            ctx.deleteFrom(table("shopping_list_item"))
+                    .where(field("shopping_list_id").in(shoppingListIds))
+                    .execute();
             ctx.deleteFrom(table("shopping_list_authorization"))
                     .where(field("shopping_list_id").in(
-                       ctx.select(field("id"))
-                               .from("shopping_list")
-                               .where(field("owner").eq(id))
+                            shoppingListIds
                     ))
                     .execute();
             DSL.using(configuration).deleteFrom(table("shopping_list_authorization"))

@@ -301,14 +301,78 @@ public class ShoppingListDAO {
                 .fetch(new UserDAO.UserMapper())
                 .stream().map(userFromDb -> new User(userFromDb.getId(), userFromDb.getVersion(), userFromDb.getName(), null))
                 .collect(Collectors.toList());
+        List<ShoppingListItem> items = dslContext.select()
+                .from("shopping_list_item")
+                .where(field("shopping_list_id").eq(shoppingListId))
+                .orderBy(field("sort_order"))
+                .fetch(new ShoppingListItemMapper());
         return new EnrichedShoppingList(
                 shoppingList.getId(),
                 shoppingList.getVersion(),
                 shoppingList.getName(),
                 shoppingList.getOwner(),
                 members,
-                invitedUsers
+                invitedUsers,
+                items
         );
+    }
+
+    public EnrichedShoppingList addShoppingListItem(User authenticatedUser, String shoppingListId, ShoppingListItem shoppingListItem) {
+        getShoppingList(authenticatedUser, shoppingListId);
+        String newId = UUID.randomUUID().toString();
+        String newVersion = UUID.randomUUID().toString();
+        int count = dslContext.update(table("shopping_list"))
+                .set(field("version"), UUID.randomUUID())
+                .execute();
+        if (count == 0) {
+            throw new ApplicationException("ShoppingList not found.");
+        }
+        dslContext.insertInto(table("shopping_list_item"))
+                .columns(
+                        field("id"),
+                        field("version"),
+                        field("name"),
+                        field("created_by"),
+                        field("modified_by"),
+                        field("bought_by"),
+                        field("state_changed_by"),
+                        field("shopping_list_id"),
+                        field("sort_order"))
+                .values(
+                        newId,
+                        newVersion,
+                        shoppingListItem.getName(),
+                        authenticatedUser.getId(),
+                        authenticatedUser.getId(),
+                        null,
+                        authenticatedUser.getId(),
+                        shoppingListId,
+                        dslContext.selectCount()
+                                .from("shopping_list_item")
+                                .where(field("shopping_list_id").eq(shoppingListId))
+                                .fetchOne(0, Integer.class)
+                )
+                .execute();
+        return getEnrichedShoppingList(authenticatedUser, shoppingListId);
+    }
+
+    public EnrichedShoppingList removeItem(User authenticatedUser, String shoppingListId, ShoppingListItem item) {
+        getShoppingList(authenticatedUser, shoppingListId);
+        int count = dslContext.update(table("shopping_list"))
+                .set(field("version"), UUID.randomUUID())
+                .execute();
+        if (count == 0) {
+            throw new ApplicationException("ShoppingList not found.");
+        }
+        count = dslContext.deleteFrom(table("shopping_list_item"))
+                .where(field("shopping_list_id").eq(shoppingListId))
+                .and(field("id").eq(item.getId()))
+                .and(field("version").eq(item.getVersion()))
+                .execute();
+        if (count == 0) {
+            throw new ApplicationException("Cannot remove ShoppingListItem.");
+        }
+        return getEnrichedShoppingList(authenticatedUser, shoppingListId);
     }
 
     public static class ShoppingListMapper implements RecordMapper<Record, ShoppingList> {
@@ -319,6 +383,21 @@ public class ShoppingListDAO {
                     record.getValue("version", String.class),
                     record.getValue("name", String.class),
                     record.getValue("owner", String.class)
+            );
+        }
+    }
+
+    public static class ShoppingListItemMapper implements RecordMapper<Record,ShoppingListItem> {
+        @Override
+        public ShoppingListItem map(Record record) {
+            return new ShoppingListItem(
+                    record.getValue("id", String.class),
+                    record.getValue("version", String.class),
+                    record.getValue("name", String.class),
+                    record.getValue("created_by", String.class),
+                    record.getValue("modified_by", String.class),
+                    record.getValue("bought_by", String.class),
+                    record.getValue("state_changed_by", String.class)
             );
         }
     }

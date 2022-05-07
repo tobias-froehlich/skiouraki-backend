@@ -1,5 +1,6 @@
 package org.example;
 
+import org.jooq.Record;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -742,6 +743,7 @@ public class ShoppingListDAOTest extends TestWithDB {
                 "Jack's shopping list",
                 JACK.getId(),
                 List.of(JACK),
+                List.of(),
                 List.of());
         EnrichedShoppingList actual = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
         assertThat(actual).isEqualTo(expected);
@@ -760,7 +762,8 @@ public class ShoppingListDAOTest extends TestWithDB {
                 "Jack's shopping list",
                 JACK.getId(),
                 List.of(JACK, JOHN),
-                List.of(JOE));
+                List.of(JOE),
+                List.of());
         EnrichedShoppingList actual1 = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
         assertThat(actual1).isEqualTo(expected);
         EnrichedShoppingList actual2 = shoppingListDAO.getEnrichedShoppingList(JOHN, shoppingList.getId());
@@ -777,6 +780,305 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThatThrownBy(() -> {
             shoppingListDAO.getEnrichedShoppingList(JOE, shoppingList.getId());
         }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+    }
+
+    @Test
+    public void testGetEnrichedShoppingListWithItems() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        dslContext.insertInto(table("shopping_list_item"))
+                .columns(
+                        field("id"),
+                        field("version"),
+                        field("name"),
+                        field("created_by"),
+                        field("modified_by"),
+                        field("state_changed_by"),
+                        field("shopping_list_id"),
+                        field("sort_order"))
+                .values(
+                        "item-id-1",
+                        "item-version-1",
+                        "Bananen",
+                        JACK.getId(),
+                        JACK.getId(),
+                        JACK.getId(),
+                        shoppingList.getId(),
+                        0)
+                .execute();
+        dslContext.insertInto(table("shopping_list_item"))
+                .columns(
+                        field("id"),
+                        field("version"),
+                        field("name"),
+                        field("created_by"),
+                        field("modified_by"),
+                        field("state_changed_by"),
+                        field("shopping_list_id"),
+                        field("sort_order"))
+                .values(
+                        "item-id-2",
+                        "item-version-2",
+                        "Äpfel",
+                        JACK.getId(),
+                        JACK.getId(),
+                        JACK.getId(),
+                        shoppingList.getId(),
+                        1)
+                .execute();
+        List<ShoppingListItem> expected = List.of(
+                new ShoppingListItem("item-id-1", "item-version-1", "Bananen", JACK.getId(), JACK.getId(), null, JACK.getId()),
+                new ShoppingListItem("item-id-2", "item-version-2", "Äpfel", JACK.getId(), JACK.getId(), null, JACK.getId())
+        );
+        List<ShoppingListItem> actual = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId()).getItems();
+        assertThat(actual).containsExactlyElementsOf(expected);
+
+    }
+
+    @Test
+    public void testAddShoppingListItem() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        ShoppingListItem newItem1 = new ShoppingListItem("", "", "Bananen", "", "", "", "");
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                newItem1
+        );
+        String newItemId1 = enrichedShoppingList.getItems().get(0).getId();
+        String newItemVersion1 = enrichedShoppingList.getItems().get(0).getVersion();
+        ShoppingListItem expectedItem1 = new ShoppingListItem(newItemId1, newItemVersion1, "Bananen", JACK.getId(), JACK.getId(), null, JACK.getId());
+        assertThat(enrichedShoppingList.getItems()).containsExactly(expectedItem1);
+        List<Record> recordsInShoppingListItem = dslContext.selectFrom("shopping_list_item").fetch();
+        assertThat(recordsInShoppingListItem).hasSize(1);
+        assertThat(recordsInShoppingListItem.get(0).getValue("name", String.class)).isEqualTo("Bananen");
+        assertThat(recordsInShoppingListItem.get(0).getValue("created_by", String.class)).isEqualTo(JACK.getId());
+        assertThat(recordsInShoppingListItem.get(0).getValue("modified_by", String.class)).isEqualTo(JACK.getId());
+        assertThat(recordsInShoppingListItem.get(0).getValue("state_changed_by", String.class)).isEqualTo(JACK.getId());
+        String itemId1 = recordsInShoppingListItem.get(0).getValue("id", String.class);
+        ShoppingListItem newItem2 = new ShoppingListItem("", "", "Äpfel", "", "", "", "");
+        enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                newItem2
+        );
+        String newItemId2 = enrichedShoppingList.getItems().get(1).getId();
+        String newItemVersion2 = enrichedShoppingList.getItems().get(1).getVersion();
+        ShoppingListItem expectedItem2 = new ShoppingListItem(newItemId2, newItemVersion2, "Äpfel", JACK.getId(), JACK.getId(), null, JACK.getId());
+        assertThat(enrichedShoppingList.getItems()).containsExactly(expectedItem1, expectedItem2);
+        recordsInShoppingListItem = dslContext.selectFrom("shopping_list_item").where(field("id").ne(itemId1)).fetch();
+        assertThat(recordsInShoppingListItem).hasSize(1);
+        assertThat(recordsInShoppingListItem.get(0).getValue("name", String.class)).isEqualTo("Äpfel");
+        assertThat(recordsInShoppingListItem.get(0).getValue("created_by", String.class)).isEqualTo(JACK.getId());
+        assertThat(recordsInShoppingListItem.get(0).getValue("modified_by", String.class)).isEqualTo(JACK.getId());
+        assertThat(recordsInShoppingListItem.get(0).getValue("state_changed_by", String.class)).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testVersionChangesWhenItemIsAdded() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        assertThat(shoppingList.getVersion()).isNotEqualTo(enrichedShoppingList.getVersion());
+    }
+
+    @Test
+    public void testTryAddItemWithoutAuthorization() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        assertThatThrownBy(() -> {
+            shoppingListDAO.addShoppingListItem(
+                    JOHN,
+                    shoppingList.getId(),
+                    new ShoppingListItem("", "", "Bananen", "", "", "", "")
+            );
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+    }
+
+    @Test
+    public void testTryAddItemWithoutAuthorizationAfterInvitation() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        assertThatThrownBy(() -> {
+            shoppingListDAO.addShoppingListItem(
+                    JOHN,
+                    shoppingList.getId(),
+                    new ShoppingListItem("", "", "Bananen", "", "", "", "")
+            );
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+    }
+
+    @Test
+    public void testAddItemAsNormalMember() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        shoppingListDAO.addShoppingListItem(
+                JOHN,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(2);
+    }
+
+    @Test
+    public void testCreatedByModifiedByStateChangedByWhenAddingItemAsOwner() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        assertThat(item.getCreatedBy()).isEqualTo(JACK.getId());
+        assertThat(item.getModifiedBy()).isEqualTo(JACK.getId());
+        assertThat(item.getStateChangedBy()).isEqualTo(JACK.getId());
+    }
+
+    @Test
+    public void testCreatedByModifiedByStateChangedByWhenAddingItemAsNormalMember() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        shoppingListDAO.addShoppingListItem(
+                JOHN,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        assertThat(item.getCreatedBy()).isEqualTo(JOHN.getId());
+        assertThat(item.getModifiedBy()).isEqualTo(JOHN.getId());
+        assertThat(item.getStateChangedBy()).isEqualTo(JOHN.getId());
+    }
+
+    @Test
+    public void testRemoveItem() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        String oldVersion = enrichedShoppingList.getVersion();
+        enrichedShoppingList = shoppingListDAO.removeItem(JACK, shoppingList.getId(), item);
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(0);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(0);
+    }
+
+    @Test
+    public void testTryToRemoveItemWithoutAuthorization() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        assertThatThrownBy(() -> {
+                    shoppingListDAO.removeItem(JOHN, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+    }
+
+    @Test
+    public void testTryToRemoveItemWithoutAuthorizationAfterInvitation() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        assertThatThrownBy(() -> {
+            shoppingListDAO.removeItem(JOHN, shoppingList.getId(), item);
+        }).isInstanceOf(ApplicationException.class).hasMessage("ShoppingList not found.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+    }
+
+    @Test
+    public void testRemoveItemAsNormalMember() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        shoppingListDAO.invite(JACK, JOHN, shoppingList.getId());
+        shoppingListDAO.acceptInvitation(JOHN, shoppingList.getId());
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem item = enrichedShoppingList.getItems().get(0);
+        String oldVersion = enrichedShoppingList.getVersion();
+        enrichedShoppingList = shoppingListDAO.removeItem(JOHN, shoppingList.getId(), item);
+        String newVersion = enrichedShoppingList.getVersion();
+        assertThat(newVersion).isNotEqualTo(oldVersion);
+        assertThat(enrichedShoppingList.getItems()).hasSize(0);
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(0);
+    }
+
+    @Test
+    public void testTryToRemoveItemWhenVersionIsOutdated() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Äpfel", "", "", "", "")
+        );
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
+        ShoppingListItem outdatedItem = enrichedShoppingList.getItems().get(0);
+        dslContext.update(table("shopping_list_item"))
+                .set(field("version"), "new-version")
+                .where(field("id").eq(outdatedItem.getId()))
+                .execute();
+        assertThatThrownBy(() -> {
+            shoppingListDAO.removeItem(JACK, shoppingList.getId(), outdatedItem);
+        }).isInstanceOf(ApplicationException.class).hasMessage("Cannot remove ShoppingListItem.");
+        enrichedShoppingList = shoppingListDAO.getEnrichedShoppingList(JACK, shoppingList.getId());
+        assertThat(enrichedShoppingList.getItems()).hasSize(1);
     }
 
 }
