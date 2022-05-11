@@ -96,6 +96,9 @@ public class ShoppingListDAO {
         ShoppingList shoppingList = getShoppingList(authenticatedUser, id);
         try {
             dslContext.transaction(configuration -> {
+                DSL.using(configuration).deleteFrom(table("shopping_list_item"))
+                        .where(field("shopping_list_id").eq(id))
+                        .execute();
                 DSL.using(configuration).deleteFrom(table("shopping_list_authorization"))
                         .where(field("shopping_list_id").eq(id))
                         .execute();

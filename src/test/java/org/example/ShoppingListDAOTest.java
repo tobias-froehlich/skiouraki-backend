@@ -1368,5 +1368,17 @@ public class ShoppingListDAOTest extends TestWithDB {
         assertThat(newItem.getStateChangedBy()).isEqualTo(JACK.getId());
     }
 
+    @Test
+    public void testDeleteShoppingListWithItems() {
+        ShoppingList shoppingList = shoppingListDAO.addShoppingList(JACK, new ShoppingList("", "", "Jack's shopping list", ""));
+        EnrichedShoppingList enrichedShoppingList = shoppingListDAO.addShoppingListItem(
+                JACK,
+                shoppingList.getId(),
+                new ShoppingListItem("", "", "Bananen", "", "", "", "")
+        );
+        ShoppingList expected = shoppingListDAO.getShoppingList(JACK, shoppingList.getId());
+        ShoppingList actual = shoppingListDAO.deleteShoppingList(JACK, shoppingList.getId());
+        assertThat(actual).isEqualTo(expected);
+    }
 
 }
