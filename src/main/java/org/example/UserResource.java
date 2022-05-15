@@ -29,7 +29,6 @@ public class UserResource {
     @GET
     @Path("get-all")
     public List<User> getAll() {
-        System.out.println("app-user/get-all is called!");
         return userDAO.getAllAppUsers();
     }
 
