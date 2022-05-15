@@ -26,16 +26,6 @@ public class UserResource {
         this.migrator = migrator;
     }
 
-    @POST
-    @Path("reset")
-    public void reset() {
-        System.out.println("reset-1");
-        migrator.reset();
-        System.out.println("reset-2");
-        migrator.migrate();
-        System.out.println("reset-3");
-    }
-
     @GET
     @Path("get-all")
     public List<User> getAll() {

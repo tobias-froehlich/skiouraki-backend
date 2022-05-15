@@ -23,6 +23,8 @@ import java.util.Set;
 public class Main {
     public static void main(String[] args) throws Exception {
 
+        boolean resetActive = "YES".equals(System.getenv("RESET_ACTIVE"));
+
         String dbUrl = null;
         String username = null;
         String password = null;
@@ -46,13 +48,14 @@ public class Main {
         try (Connection connection = DriverManager.getConnection(dbUrl, username, password)) {
             DSLContext dslContext = DSL.using(connection, SQLDialect.POSTGRES);
             Migrator migrator = new Migrator(dslContext);
-            migrator.reset();
+
             migrator.migrate();
 
             Server server = new Server(Integer.parseInt(System.getenv("PORT")));
 
             ServletContextHandler handler = new ServletContextHandler(ServletContextHandler.SESSIONS);
             handler.setContextPath("/");
+
 
             final UserDAO userDAO = new UserDAO(dslContext);
             final UserResource userResource = new UserResource(userDAO, migrator);
@@ -61,6 +64,10 @@ public class Main {
 
             ResourceConfig resourceConfig = new ResourceConfig();
             Set<Object> instances = new HashSet<>();
+            if (resetActive) {
+                final ResetResource resetResource = new ResetResource(migrator);
+                instances.add(resetResource);
+            }
             instances.add(userResource);
             instances.add(shoppingListResource);
             resourceConfig.registerInstances(instances);
