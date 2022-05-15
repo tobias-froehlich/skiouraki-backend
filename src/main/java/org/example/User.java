@@ -11,8 +11,8 @@ public class User {
     private String name;
     private String password;
 
-    private static final String VALID_CHARACTERS      = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZäöußÄÖÜẞΑΆαάΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσςΤτΥυΦφΧχΨψΩω";
-    private static final String NORMALIZED_CHARACTERS = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzaousaousaaaabbggddeezzhhttiikkllmmnnccoopprrsssttyyffxxppoo";
+    private static final String VALID_CHARACTERS      = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZäöußÄÖÜẞΑΆαάΒβΓγΔδΕΈεέΖζΗΉηήΘθΙΊιίΚκΛλΜμΝνΞξΟΌοόΠπΡρΣσςΤτΥΎυύΦφΧχΨψΩΏωώ";
+    private static final String NORMALIZED_CHARACTERS = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzaousaousaaaabbggddeeeezzhhnnttiiiikkllmmnnccoooopprrsssttyyuuffxxppoooo";
     private static final int MIN_NAME_LENGTH = 3;
     private static final int MAX_NAME_LENGTH = 16;
     private static final int MIN_PASSWORD_LENGTH = 4;
